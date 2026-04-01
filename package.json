@@ -1,0 +1,25 @@
+{
+  "name": "mountain-project",
+  "version": "1.0.0",
+  "description": "A local web portal for exploring mountain huts, bivouacs, and peaks via interactive maps, featuring an AI assistant for aggregating and summarizing hiking data",
+  "license": "ISC",
+  "author": "DaniMeri",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "fetch:data": "tsx scripts/fetch-pois.ts",
+    "build": "esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/static": "^9.0.0",
+    "fastify": "^5.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "esbuild": "^0.27.4",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
