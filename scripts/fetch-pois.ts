@@ -6,21 +6,21 @@ const BBOX = '(45.3, 8.8, 46.8, 11.8)';
 
 const OVERPASS_QUERY = `
 [out:json][timeout:60];
-// Dobbiamo cercare anche nelle vie/poligoni (nwr = node, way, relation), non solo nei nodi,
-// perché rifugi grandi come il Curò sono spesso mappati come poligoni degli edifici!
+// We must search in ways/polygons (nwr = node, way, relation), not just nodes,
+// because large huts are often mapped as building polygons!
 (
   nwr["tourism"="alpine_hut"]${BBOX};
   nwr["tourism"="wilderness_hut"]${BBOX};
-  node["natural"="peak"]["ele"~"^[2-4][0-9]{3}$"]${BBOX};
+  node["natural"="peak"]${BBOX};
 );
-out center; // Così Overpass calcola il centroide (coordinate) anche per le vie/edifici
+out center; // Overpass calculates the centroid (coordinates) even for ways/buildings
 `;
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
 async function fetchPOIs() {
-  console.log('🏔️ ScScaricando i dati da OpenStreetMap (Overpass API)...');
-  
+  console.log('���️ Downloading data from OpenStreetMap (Overpass API)...');
+
   try {
     const response = await fetch(OVERPASS_URL, {
       method: 'POST',
@@ -28,42 +28,43 @@ async function fetchPOIs() {
     });
 
     if (!response.ok) {
-      throw new Error(`Errore HTTP: ${response.status}`);
+      throw new Error(`HTTP Error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log(`✅ Trovati ${data.elements.length} elementi grezzi.`);
+    console.log(`✅ Found ${data.elements.length} raw elements.`);
 
-    // Transform OSM nodes to GeoJSON
+    // Transform OSM elements to GeoJSON
     const features = [];
 
     for (const element of data.elements) {
       const tags = element.tags || {};
-      
+
       // Determine the type of POI
       let type = 'unknown';
       if (tags.tourism === 'alpine_hut') type = 'hut';
       else if (tags.tourism === 'wilderness_hut') type = 'bivouac';
       else if (tags.natural === 'peak') type = 'peak';
 
-      // Skip unnamed peaks or low peaks to avoid cluttering the map too much
-      if (type === 'peak') {
-        const ele = parseInt(tags.ele) || 0;
-        if (!tags.name || ele < 2200) {
-          continue; 
-        }
+      // Skip unnamed peaks to avoid cluttering the map with useless data
+      if (type === 'peak' && !tags.name) {
+        continue;
       }
 
-      // We extract coordinates. Ways/relations use "center", nodes use "lat"/"lon" directly.
+      // Extract coordinates. Ways/relations use "center", nodes use "lat"/"lon" directly.
       const lat = element.lat || element.center?.lat;
       const lon = element.lon || element.center?.lon;
 
-      if (!lat || !lon) continue; // safety check
+      if (!lat || !lon) continue; // Safety check
 
       // Default name if missing
-      const name = tags.name || `Sconosciuto (${type})`;
+      const name = tags.name || `Unknown (${type})`;
 
-      const elevation = tags.ele ? parseInt(tags.ele) : 'N/D';
+      // Store a valid number for elevation whenever possible, to allow sorting
+      const parsedEle = parseInt(tags.ele);
+      const elevation = isNaN(parsedEle) ? 0 : parsedEle;
+      const elevationLabel = isNaN(parsedEle) ? 'N/D' : parsedEle;
+
       const website = tags.website || tags['contact:website'] || '';
 
       features.push({
@@ -72,7 +73,8 @@ async function fetchPOIs() {
           id: element.id,
           name: name,
           type: type,
-          elevation: elevation,
+          elevation: elevationLabel, // Used for display
+          sort_elevation: elevation, // Used for sorting priorities
           website: website,
           description: tags.description || '',
           osm_id: element.id
@@ -89,16 +91,15 @@ async function fetchPOIs() {
       features: features
     };
 
-    // Save to the public/data folder so Fastify can serve it to the frontend map!
-    // Using current cwd path to avoid resolution errors
+    // Save to the public/data folder so Fastify can serve it to the frontend map
     const outputPath = path.join(process.cwd(), 'public/data/pois.geojson');
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(geojson, null, 2));
 
-    console.log(`🗺️ Salvato ${features.length} Punti di Interesse in ${outputPath}`);
+    console.log(`���️ Saved ${features.length} Points of Interest to ${outputPath}`);
 
   } catch (error) {
-    console.error('❌ Errore durante il fetch:', error);
+    console.error('❌ Error during fetch:', error);
   }
 }
 

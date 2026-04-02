@@ -8,106 +8,7 @@
   <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js'></script>
   <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css' rel='stylesheet' />
   
-  <style>
-    /* Basic CSS to reset margins and flex layout */
-    body { 
-      margin: 0; padding: 0; display: flex; flex-direction: column; 
-      height: 100vh; font-family: system-ui, sans-serif;
-      background-color: #e9ecef; /* Light gray background to highlight boxes */
-    }
-    header { background-color: #2c3e50; color: white; padding: 1.5rem; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; }
-    h1 { margin: 0; font-size: 1.7rem; letter-spacing: 1px; }
-    
-    /* Main container holding the boxes with spacing */
-    main { 
-      display: flex; 
-      flex: 1; 
-      overflow: hidden; 
-      padding: 2rem; /* Empty space around the boxes */
-      gap: 2rem;     /* Empty space between map and panel */
-      box-sizing: border-box;
-    }
-    
-    /* The map container as a floating box on the left */
-    #map-container { 
-      position: relative;
-      flex: 0 0 50%; /* Takes 50% width */
-      max-width: 800px;
-      height: 100%; /* Or could be a fixed px height like 600px */
-      border-radius: 12px; /* Rounded corners for the "box" effect */
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15); /* Shadow to make it pop */
-      border: 4px solid white; /* Nice white border frame */
-      overflow: hidden;
-    }
-    
-    #map { width: 100%; height: 100%; }
-
-    /* Map style switcher menu */
-    #menu {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 10px 14px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      font-size: 0.9rem;
-      z-index: 10; /* Keep it above the map layer */
-    }
-    #menu label { margin-right: 10px; cursor: pointer; font-weight: bold; color: #2c3e50; }
-    
-    /* Search box system */
-    #search-container {
-      position: absolute;
-      top: 10px;
-      left: 250px; /* Spostato più a destra per non sovrapporsi al menu */
-      z-index: 10;
-      width: 250px;
-    }
-    #search-box {
-      width: 100%;
-      padding: 10px;
-      border: none;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      box-sizing: border-box;
-      font-size: 0.9rem;
-      font-family: inherit;
-    }
-    #search-box:focus { outline: 2px solid #3498db; }
-    
-    #search-results {
-      list-style: none;
-      margin: 4px 0 0 0;
-      padding: 0;
-      max-height: 250px;
-      overflow-y: auto;
-      background: white;
-      width: 100%;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      display: none; /* Hidden by default */
-    }
-    #search-results li {
-      padding: 10px;
-      border-bottom: 1px solid #f1f2f6;
-      cursor: pointer;
-      font-size: 0.85rem;
-      color: #2c3e50;
-    }
-    #search-results li:last-child { border-bottom: none; }
-    #search-results li:hover { background-color: #f8f9fa; color: #3498db; }
-
-    /* Content panel as a separate box on the right */
-    #panel { 
-      flex: 1; 
-      padding: 2.5rem; 
-      background-color: white; 
-      border-radius: 12px; 
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1); 
-      overflow-y: auto; 
-    }
-  </style>
+  <link href="./css/style.css" rel="stylesheet" />
 </head>
 <body>
 
@@ -118,17 +19,28 @@
   <main>
     <div id='map-container'>
       <div id='map'></div>
-      <div id='menu'>
-        <input id='outdoors-v12' type='radio' name='rtoggle' value='outdoors-v12' checked='checked'>
-        <label for='outdoors-v12'>Outdoors</label>
-        <input id='satellite-streets-v12' type='radio' name='rtoggle' value='satellite-streets-v12'>
-        <label for='satellite-streets-v12'>Satellite</label>
-      </div>
-      
-      <!-- New Search System UI -->
-      <div id='search-container'>
-        <input type='text' id='search-box' placeholder='Cerca rifugio, vetta, bivacco...' autocomplete='off' />
-        <ul id='search-results'></ul>
+
+      <div id='top-controls'>
+        <div id='menu'>
+          <div class='menu-option'>
+            <input id='outdoors-v12' type='radio' name='rtoggle' value='outdoors-v12' checked='checked'>
+            <label for='outdoors-v12'>Outdoors</label>
+          </div>
+          <div class='menu-option'>
+            <input id='satellite-streets-v12' type='radio' name='rtoggle' value='satellite-streets-v12'>
+            <label for='satellite-streets-v12'>Satellite 2D</label>
+          </div>
+          <div class='menu-option'>
+            <input id='satellite-3d' type='radio' name='rtoggle' value='satellite-streets-v12'>
+            <label for='satellite-3d'>Satellite 3D</label>
+          </div>
+        </div>
+        
+        <!-- New Search System UI -->
+        <div id='search-container'>
+          <input type='text' id='search-box' placeholder='Cerca rifugio, vetta, bivacco...' autocomplete='off' />
+          <ul id='search-results'></ul>
+        </div>
       </div>
     </div>
     <div id='panel'>
@@ -137,206 +49,7 @@
     </div>
   </main>
 
-  <script>
-    // Insert your Mapbox token here
-    mapboxgl.accessToken = 'pk.eyJ1IjoiZGFuaW1lcmkiLCJhIjoiY21uZzFhaWdpMDIyajJyczY4YWFudzJ2ZyJ9.CbG1-cZKowq0cF8qCw2RDw';
-    
-    // Initialize the map
-    const map = new mapboxgl.Map({
-      container: 'map', 
-      style: 'mapbox://styles/mapbox/outdoors-v12', 
-      center: [10.02, 46.03], // Centered closer to Presolana/Orobie Alps for our test data
-      zoom: 11 
-    });
-
-    // Add navigation controls (zoom in/out, rotation)
-    map.addControl(new mapboxgl.NavigationControl());
-
-    // Every time the map style loads (on start and when switching to Satellite),
-    // we must (re)draw our custom points over the new base map.
-    map.on('style.load', () => {
-      
-      // --- LOAD CUSTOM ICONS ---
-      // Less invasive, classic topographic styling (smaller, simpler shapes)
-      const customIcons = {
-        // A small, simple dark red house for huts (like OSM)
-        'hut-icon': 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M10%203%20L3%209%20h2%20v8%20h10%20V9%20h2%20L10%203%20z%22%20fill%3D%22%23c0392b%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E',
-        // A small orange tent for bivouacs
-        'bivouac-icon': 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M10%205%20L3%2015%20h14%20L10%205%20z%20m0%203%20l3%206%20H7%20l3%20-6%20z%22%20fill%3D%22%23d35400%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E',
-        // A simple brown/purple triangle for peaks (classic topo map symbol)
-        'peak-icon': 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpolygon%20points%3D%229%2C2%203%2C14%2015%2C14%22%20fill%3D%22%238e44ad%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E'
-      };
-
-      // Add them dynamically to Mapbox's image registry
-      Object.keys(customIcons).forEach(id => {
-        // We use the intrinsic size of the new smaller icons (around 18-20px instead of 28px)
-        const img = new Image(); 
-        img.src = customIcons[id];
-        img.onload = () => {
-          if (!map.hasImage(id)) map.addImage(id, img);
-        };
-      });
-
-      // 1. Add our data source Fetching the real json from our local server 
-      map.addSource('mountain-pois', {
-        type: 'geojson',
-        data: '/data/pois.geojson' // FASTIFY serves this via the public folder!
-      });
-
-      // 2. Add a graphical layer to show the points as CUSTOM ICONS
-      map.addLayer({
-        id: 'pois-points',
-        type: 'symbol',
-        source: 'mountain-pois',
-        minzoom: 11, // Show only when zoomed in
-        layout: {
-          'icon-image': [
-            'match',
-            ['get', 'type'],
-            'hut', 'hut-icon',      
-            'bivouac', 'bivouac-icon',  
-            'peak', 'peak-icon',    
-            'hut-icon' // Default
-          ],
-          'icon-size': 1, 
-          'icon-allow-overlap': true, // Changed so icons don't hide each other!
-          'text-allow-overlap': false, // Text will still hide if crowded, keeping it readable
-          
-          // The text label directly below
-          'text-field': ['get', 'name'],
-          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'], // Switched to Regular for a less invasive look
-          'text-size': 11, // Smaller text
-          'text-anchor': 'top',
-          'text-offset': [0, 0.6] // Tighter distance relative to the small icon
-        },
-        paint: {
-          'text-color': '#4a4a4a', // Dark grey instead of deep black
-          'text-halo-color': 'rgba(255,255,255,0.9)',
-          'text-halo-width': 1.5 // Thinner halo
-        }
-      });
-    });
-
-    // --- INTERACTIVITY: What happens when we click/hover ---
-
-    // Change cursor to a pointer when hovering over our custom points
-    map.on('mouseenter', 'pois-points', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'pois-points', () => {
-      map.getCanvas().style.cursor = '';
-    });
-
-    // Handle clicks on our points
-    map.on('click', 'pois-points', (e) => {
-      updatePanel(e.features[0].properties);
-    });
-
-    // Funzione centralizzata per aggiornare il pannello di destra
-    function updatePanel(props) {
-      const panel = document.getElementById('panel');
-      
-      const typeCapitalized = props.type.charAt(0).toUpperCase() + props.type.slice(1);
-      const descHTML = props.description ? `<p>${props.description}</p>` : `<p><em>Nessuna descrizione disponibile.</em></p>`;
-      const siteHTML = props.website ? `<p><a href="${props.website}" target="_blank">Visita il sito web</a></p>` : '';
-      
-      panel.innerHTML = `
-        <h2>${props.name}</h2>
-        <div style="margin-bottom: 20px;">
-          <span style="background-color: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
-            ${typeCapitalized}
-          </span>
-          <span style="background-color: #7f8c8d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
-            ${props.elevation}m slm
-          </span>
-        </div>
-        ${descHTML}
-        ${siteHTML}
-        
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <p style="color: #e67e22; font-style: italic;">
-          🤖 <strong>AI Assistant:</strong> "In futuro, quando cliccherai qui, leggerò recensioni su ${props.name} per dirti com'è lo stato del sentiero oggi!"
-        </p>
-      `;
-    }
-
-    // --- SEARCH SYSTEM ---
-    let allPoints = [];
-    
-    // Asynchronously load the data to feed the search bar independent of the map drawing
-    fetch('/data/pois.geojson')
-      .then(res => res.json())
-      .then(data => {
-        allPoints = data.features;
-      })
-      .catch(err => console.error("Error loading search data: ", err));
-
-    const searchBox = document.getElementById('search-box');
-    const searchResults = document.getElementById('search-results');
-
-    // Listener for when the user types in the search bar
-    searchBox.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase();
-      searchResults.innerHTML = '';
-      searchResults.style.display = 'none';
-
-      if (query.length < 2) return; // Only start searching after 2 chars
-
-      // Filter exactly like a modern maps search (limit to 10 results so it doesn't freeze)
-      const matches = allPoints.filter(f => 
-        f.properties.name && f.properties.name.toLowerCase().includes(query)
-      ).slice(0, 10);
-
-      if (matches.length > 0) {
-        searchResults.style.display = 'block'; // Show dropdown
-        matches.forEach(feat => {
-          const li = document.createElement('li');
-          const typeIcon = feat.properties.type === 'hut' ? '🏠' : (feat.properties.type === 'bivouac' ? '⛺' : '⛰️');
-          
-          li.innerHTML = `${typeIcon} <strong>${feat.properties.name}</strong> <small>(${feat.properties.elevation} m)</small>`;
-          
-          // Action when a result is clicked
-          li.addEventListener('click', () => {
-            // Update search box and close results
-            searchBox.value = feat.properties.name;
-            searchResults.innerHTML = '';
-            searchResults.style.display = 'none';
-
-            // Fly the map smoothly to the coordinates
-            map.flyTo({
-              center: feat.geometry.coordinates,
-              zoom: 14, // Zoom in closely to see it properly
-              speed: 1.5, // Make the fly speed pleasant
-              essential: true // This animation is considered essential
-            });
-
-            // Update panel so we immediately see the data too!
-            updatePanel(feat.properties);
-          });
-          
-          searchResults.appendChild(li);
-        });
-      }
-    });
-
-    // Close the search results if we click anywhere else on the screen
-    document.addEventListener('click', (e) => {
-      if(e.target.id !== 'search-box') {
-        searchResults.style.display = 'none';
-      }
-    });
-
-    // Switch map style dynamically
-    const layerList = document.getElementById('menu');
-    const inputs = layerList.getElementsByTagName('input');
-
-    for (const input of inputs) {
-      input.onclick = (e) => {
-        const layerId = e.target.id;
-        map.setStyle('mapbox://styles/mapbox/' + layerId);
-      };
-    }
-  </script>
+  <script type="module" src="./js/main.js"></script>
 
 </body>
 </html>
