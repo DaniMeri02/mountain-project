@@ -3,6 +3,32 @@ import { updatePanel } from './ui.js';
 
 // We store the current selection to know if 3D should be applied after a style loads
 let currentMode = 'outdoors-v12';
+let latestFetchToken = 0;
+
+// Cache features by OSM id so zoom transitions do not blank the layer
+// while awaiting the next viewport response.
+const trailFeatureCache = new Map();
+const poiFeatureCache = new Map();
+
+function featureKey(feature) {
+  const props = feature && feature.properties ? feature.properties : {};
+  return String(props.osm_id || props.id || '');
+}
+
+function mergeIntoCache(cache, features) {
+  if (!Array.isArray(features)) return;
+  for (const feature of features) {
+    const key = featureKey(feature);
+    if (key) cache.set(key, feature);
+  }
+}
+
+function cacheToFeatureCollection(cache) {
+  return {
+    type: 'FeatureCollection',
+    features: Array.from(cache.values())
+  };
+}
 
 export function addMapLayers(map) {
   // Load custom marker icons
@@ -42,7 +68,9 @@ export function addMapLayers(map) {
   if (!map.getSource('mountain-pois')) {
     map.addSource('mountain-pois', {
       type: 'geojson',
-      data: '/data/pois.geojson'
+      data: { type: 'FeatureCollection', features: [] },
+      maxzoom: 14,
+      buffer: 128
     });
   }
 
@@ -83,51 +111,143 @@ export function addMapLayers(map) {
     });
   }
 
-  // Add trails data source
+  // Add trails data source (Starting empty instead of huge file)
   if (!map.getSource('mountain-trails')) {
     map.addSource('mountain-trails', {
       type: 'geojson',
-      data: '/data/trails.geojson'
+      data: { type: 'FeatureCollection', features: [] },
+      buffer: 256, // Increased buffer for high-zoom line rendering
+      lineMetrics: true
     });
   }
 
   // Add trails visual layer
   if (!map.getLayer('trails-lines')) {
-    map.addLayer({
-      id: 'trails-lines',
-      type: 'line',
-      source: 'mountain-trails',
-      minzoom: 12, // Ensure trails are hidden when zoomed out
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': [
-          'match',
-          ['get', 'sac_scale'],
-          'hiking', '#4CAF50',
-          'mountain_hiking', '#FFC107',
-          'demanding_mountain_hiking', '#FF9800',
-          'alpine_hiking', '#F44336',
-          'demanding_alpine_hiking', '#9C27B0',
-          'difficult_alpine_hiking', '#000000',
-          '#607D8B'
-        ],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          10, 1.5,
-          15, 3,
-          20, 5
-        ],
-        'line-dasharray': [
-          'case',
-          ['==', ['get', 'trail_visibility'], 'no'], ['literal', [1, 3]],
-          ['==', ['get', 'trail_visibility'], 'bad'], ['literal', [2, 2]],
-          ['literal', [1, 0]]
-        ]
-      }
-    }, 'pois-points');
+    // Always start trails as visible - setupStyleSwitcher will sync checkbox state
+    const isVisible = 'visible';
+
+    try {
+      map.addLayer({
+        id: 'trails-lines',
+        type: 'line',
+        source: 'mountain-trails',
+        minzoom: 11,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          'visibility': isVisible
+        },
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'sac_scale'],
+            'track', '#9E9E9E',
+            'footway', '#B0BEC5',
+            'bridleway', '#8D6E63',
+            'steps', '#607D8B',
+            'cycleway', '#26A69A',
+            'hiking', '#4CAF50',
+            'mountain_hiking', '#FFC107',
+            'demanding_mountain_hiking', '#FF9800',
+            'alpine_hiking', '#F44336',
+            'demanding_alpine_hiking', '#9C27B0',
+            'difficult_alpine_hiking', '#000000',
+            'unknown', '#9E9E9E',
+            '#9E9E9E'
+          ],
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            10, 1.5,
+            15, 3,
+            20, 5,
+            24, 8
+          ],
+          'line-opacity': 0.95
+        }
+      });
+    } catch (e) {
+      console.warn("Could not add trails layer on top", e);
+      map.addLayer({
+        id: 'trails-lines',
+        type: 'line',
+        source: 'mountain-trails',
+        minzoom: 11,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          'visibility': isVisible
+        },
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'sac_scale'],
+            'track', '#9E9E9E',
+            'footway', '#B0BEC5',
+            'bridleway', '#8D6E63',
+            'steps', '#607D8B',
+            'cycleway', '#26A69A',
+            'hiking', '#4CAF50',
+            'mountain_hiking', '#FFC107',
+            'demanding_mountain_hiking', '#FF9800',
+            'alpine_hiking', '#F44336',
+            'demanding_alpine_hiking', '#9C27B0',
+            'difficult_alpine_hiking', '#000000',
+            'unknown', '#9E9E9E',
+            '#9E9E9E'
+          ],
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            10, 1.5,
+            15, 3,
+            20, 5,
+            24, 8
+          ],
+          'line-opacity': 0.95
+        }
+      }); // fallback to default Z-index
+    }
+  }
+} // matches the original close of addMapLayers
+
+// Live database fetcher based on current screen viewport!
+export async function fetchDynamicData(map) {
+  const fetchToken = ++latestFetchToken;
+  const bounds = map.getBounds();
+  
+  // Expand the bounding box
+  const expand = 0.05; 
+  const minLng = bounds.getWest() - expand;
+  const minLat = bounds.getSouth() - expand;
+  const maxLng = bounds.getEast() + expand;
+  const maxLat = bounds.getNorth() + expand;
+
+  // Don't fetch below zoom 10 to avoid heavy server queries
+  if (map.getZoom() < 10) return;
+
+  try {
+    const trailsUrl = `/api/trails?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
+    const poisUrl = `/api/pois?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
+    const [trailsRes, poisRes] = await Promise.all([fetch(trailsUrl), fetch(poisUrl)]);
+
+    // Ignore stale responses from previous zoom/pan requests.
+    if (fetchToken !== latestFetchToken) return;
+
+    const trailsData = await trailsRes.json();
+    const poisData = await poisRes.json();
+
+    // Merge new viewport data into cache to prevent brief/empty responses
+    // from wiping already visible features during zoom transitions.
+    mergeIntoCache(trailFeatureCache, trailsData && trailsData.features ? trailsData.features : []);
+    mergeIntoCache(poiFeatureCache, poisData && poisData.features ? poisData.features : []);
+
+    if (map.getSource('mountain-trails')) {
+      map.getSource('mountain-trails').setData(cacheToFeatureCollection(trailFeatureCache));
+    }
+    if (map.getSource('mountain-pois')) {
+      map.getSource('mountain-pois').setData(cacheToFeatureCollection(poiFeatureCache));
+    }
+  } catch (error) {
+    console.error("Error fetching live trails from DB:", error);
   }
 }
 
@@ -143,6 +263,10 @@ export function setupMapInteractivity(map) {
   map.on('click', 'pois-points', (e) => {
     updatePanel(e.features[0].properties);
   });
+
+  // Listen to map pan/zoom events to dynamically fetch from PostGIS backend
+  map.on('moveend', () => fetchDynamicData(map));
+  map.on('zoomend', () => fetchDynamicData(map));
 }
 
 export function setupStyleSwitcher(map) {
@@ -164,5 +288,15 @@ export function setupStyleSwitcher(map) {
         map.easeTo({ pitch: 0, bearing: 0 }); // Reset to flat
       }
     };
+  }
+
+  // Setup toggle button for trails visibility
+  const toggleTrailsBtn = document.getElementById('toggle-trails');
+  if (toggleTrailsBtn) {
+    toggleTrailsBtn.addEventListener('change', (e) => {
+      if (map.getLayer('trails-lines')) {
+        map.setLayoutProperty('trails-lines', 'visibility', e.target.checked ? 'visible' : 'none');
+      }
+    });
   }
 }
