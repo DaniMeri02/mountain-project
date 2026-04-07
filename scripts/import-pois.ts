@@ -43,13 +43,15 @@ async function importPois() {
         );
         inserted++;
       } catch (err) {
-        console.error(`Failed to insert POI: ${props.name}`, err.message);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to insert POI: ${props.name}`, errorMessage);
       }
     }
     
     console.log(`[OK] Upserted ${inserted} POIs into the database.`);
   } catch (err) {
-    console.error("[ERROR] Error reading or parsing pois.geojson:", err.message);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("[ERROR] Error reading or parsing pois.geojson:", errorMessage);
   } finally {
     await pool.end();
   }

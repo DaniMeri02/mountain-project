@@ -11,6 +11,22 @@ const pool = new Pool({
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type OverpassPoint = {
+  lon: number;
+  lat: number;
+};
+
+type OverpassWay = {
+  type: 'way';
+  id: number;
+  geometry?: OverpassPoint[];
+  tags?: Record<string, string>;
+};
+
+type OverpassResponse = {
+  elements?: OverpassWay[];
+};
+
 // Chunks that likely exhausted retries based on import logs/screenshots.
 const FAILED_CHUNK_IDS = [41, 42, 43, 46, 60, 83, 100];
 
@@ -80,11 +96,11 @@ async function importMicroChunk(chunkId: number, microIdx: number, bbox: { minLa
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const data: any = await response.json();
+      const data = (await response.json()) as OverpassResponse;
       let inserted = 0;
       for (const element of data.elements || []) {
         if (element.type !== 'way' || !element.geometry) continue;
-        const coordinates = element.geometry.map((pt: any) => `[${pt.lon}, ${pt.lat}]`).join(', ');
+        const coordinates = element.geometry.map((pt) => `[${pt.lon}, ${pt.lat}]`).join(', ');
         const geojsonGeom = `{"type":"LineString","coordinates":[${coordinates}]}`;
         const sacScale = element.tags?.sac_scale || 'unknown';
         const highway = element.tags?.highway || 'unknown';
@@ -102,13 +118,14 @@ async function importMicroChunk(chunkId: number, microIdx: number, bbox: { minLa
 
       console.log(`  [chunk ${chunkId}.${microIdx}] success, inserted ${inserted}`);
       return true;
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       retries--;
       if (retries <= 0) {
-        console.error(`  [chunk ${chunkId}.${microIdx}] failed permanently: ${err.message}`);
+        console.error(`  [chunk ${chunkId}.${microIdx}] failed permanently: ${errorMessage}`);
         return false;
       }
-      console.log(`  [chunk ${chunkId}.${microIdx}] error: ${err.message}, retrying in 10s... (${retries} left)`);
+      console.log(`  [chunk ${chunkId}.${microIdx}] error: ${errorMessage}, retrying in 10s... (${retries} left)`);
       await delay(10000);
     }
   }

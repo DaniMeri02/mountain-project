@@ -21,6 +21,11 @@ for (let lat = 45.3; lat < 46.8; lat += 0.15) {
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type OverpassPoint = {
+  lon: number;
+  lat: number;
+};
+
 async function fetchTracks() {
   console.log(`[INFO] Downloading trail-like paths (track, footway, bridleway, steps, cycleway) in ${BBOXES.length} chunks...`);
   
@@ -73,7 +78,7 @@ async function fetchTracks() {
         for (const element of data.elements) {
           if (element.type === 'way' && element.geometry) {
             // Using "out geom;" makes Overpass return the line points directly!
-            const coordinates = element.geometry.map((pt: any) => `[${pt.lon}, ${pt.lat}]`).join(', ');
+            const coordinates = (element.geometry as OverpassPoint[]).map((pt) => `[${pt.lon}, ${pt.lat}]`).join(', ');
             const geojsonGeom = `{"type": "LineString", "coordinates": [${coordinates}]}`;
             
             const sacScale = element.tags?.sac_scale || 'unknown';
@@ -97,10 +102,11 @@ async function fetchTracks() {
         console.log(`   [OK] Inserted ${inserted} new trail-like ways into DB for chunk ${i+1}.`);
         success = true;
 
-      } catch (err: any) {
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         retries--;
         if (retries > 0) {
-          console.log(`   [WARN] Network error (${err.message}). Retrying in 10s...`);
+          console.log(`   [WARN] Network error (${errorMessage}). Retrying in 10s...`);
           await delay(10000);
         } else {
           console.error(`   [ERROR] Failed Chunk ${i+1} entirely! Extent: ${bbox}`);

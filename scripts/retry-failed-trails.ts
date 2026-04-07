@@ -23,6 +23,11 @@ const FAILED_BBOXES = [
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type OverpassPoint = {
+  lon: number;
+  lat: number;
+};
+
 async function retryFailedTrails() {
   console.log(`🔄 Retrying ${FAILED_BBOXES.length} previously failed chunks...`);
 
@@ -64,7 +69,7 @@ async function retryFailedTrails() {
         let inserted = 0;
         for (const element of data.elements) {
           if (element.type === 'way' && element.geometry) {
-            const coordinates = element.geometry.map((pt: any) => `[${pt.lon}, ${pt.lat}]`).join(', ');
+            const coordinates = (element.geometry as OverpassPoint[]).map((pt) => `[${pt.lon}, ${pt.lat}]`).join(', ');
             const geojsonGeom = `{"type": "LineString", "coordinates": [${coordinates}]}`;
             
             const sacScale = element.tags && element.tags['sac_scale'] ? element.tags['sac_scale'] : 'unknown';
@@ -83,8 +88,10 @@ async function retryFailedTrails() {
         console.log(`✅ Success! Inserted ${inserted} trails into DB for this chunk.`);
         success = true;
 
-      } catch (err: any) {
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         console.error(`❌ Network/Timeout error. Retrying in 90s... (${retries - 1} left)`);
+        console.error(`   Reason: ${errorMessage}`);
         await delay(90000);
         retries--;
       }

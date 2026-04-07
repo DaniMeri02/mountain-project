@@ -126,86 +126,56 @@ export function addMapLayers(map) {
     // Always start trails as visible - setupStyleSwitcher will sync checkbox state
     const isVisible = 'visible';
 
-    try {
-      map.addLayer({
-        id: 'trails-lines',
-        type: 'line',
-        source: 'mountain-trails',
-        minzoom: 11,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-          'visibility': isVisible
-        },
-        paint: {
-          'line-color': [
-            'match',
-            ['get', 'sac_scale'],
-            'track', '#9E9E9E',
-            'footway', '#B0BEC5',
-            'bridleway', '#8D6E63',
-            'steps', '#607D8B',
-            'cycleway', '#26A69A',
-            'hiking', '#4CAF50',
-            'mountain_hiking', '#FFC107',
-            'demanding_mountain_hiking', '#FF9800',
-            'alpine_hiking', '#F44336',
-            'demanding_alpine_hiking', '#9C27B0',
-            'difficult_alpine_hiking', '#000000',
-            'unknown', '#9E9E9E',
-            '#9E9E9E'
-          ],
-          'line-width': [
-            'interpolate', ['linear'], ['zoom'],
-            10, 1.5,
-            15, 3,
-            20, 5,
-            24, 8
-          ],
-          'line-opacity': 0.95
-        }
-      });
-    } catch (e) {
-      console.warn("Could not add trails layer on top", e);
-      map.addLayer({
-        id: 'trails-lines',
-        type: 'line',
-        source: 'mountain-trails',
-        minzoom: 11,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-          'visibility': isVisible
-        },
-        paint: {
-          'line-color': [
-            'match',
-            ['get', 'sac_scale'],
-            'track', '#9E9E9E',
-            'footway', '#B0BEC5',
-            'bridleway', '#8D6E63',
-            'steps', '#607D8B',
-            'cycleway', '#26A69A',
-            'hiking', '#4CAF50',
-            'mountain_hiking', '#FFC107',
-            'demanding_mountain_hiking', '#FF9800',
-            'alpine_hiking', '#F44336',
-            'demanding_alpine_hiking', '#9C27B0',
-            'difficult_alpine_hiking', '#000000',
-            'unknown', '#9E9E9E',
-            '#9E9E9E'
-          ],
-          'line-width': [
-            'interpolate', ['linear'], ['zoom'],
-            10, 1.5,
-            15, 3,
-            20, 5,
-            24, 8
-          ],
-          'line-opacity': 0.95
-        }
-      }); // fallback to default Z-index
-    }
+    const styleLayers = map.getStyle().layers || [];
+    const labelAnchorIds = [
+      'road-label',
+      'poi-label',
+      'mountain_peak-label',
+      'settlement-label',
+      'place-label'
+    ];
+    const explicitAnchor = styleLayers.find((layer) => labelAnchorIds.includes(layer.id));
+    const firstSymbolLayer = styleLayers.find((layer) => layer.type === 'symbol');
+    const trailsBeforeLayerId = (explicitAnchor && explicitAnchor.id) || (firstSymbolLayer && firstSymbolLayer.id);
+
+    map.addLayer({
+      id: 'trails-lines',
+      type: 'line',
+      source: 'mountain-trails',
+      minzoom: 12,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        'visibility': isVisible
+      },
+      paint: {
+        'line-color': [
+          'match',
+          ['get', 'sac_scale'],
+          'track', '#9E9E9E',
+          'footway', '#B0BEC5',
+          'bridleway', '#8D6E63',
+          'steps', '#607D8B',
+          'cycleway', '#26A69A',
+          'hiking', '#4CAF50',
+          'mountain_hiking', '#FFC107',
+          'demanding_mountain_hiking', '#FF9800',
+          'alpine_hiking', '#F44336',
+          'demanding_alpine_hiking', '#9C27B0',
+          'difficult_alpine_hiking', '#000000',
+          'unknown', '#9E9E9E',
+          '#9E9E9E'
+        ],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 1.5,
+          15, 3,
+          20, 5,
+          24, 8
+        ],
+        'line-opacity': 0.95
+      }
+    }, trailsBeforeLayerId);
   }
 } // matches the original close of addMapLayers
 

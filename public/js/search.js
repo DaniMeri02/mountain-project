@@ -5,11 +5,28 @@ export async function initSearch(map) {
   const searchResults = document.getElementById('search-results');
 
   let debounceTimer;
+  let lastMatches = [];
+
+  function goToFeature(feat) {
+    searchBox.value = feat.name;
+    searchResults.innerHTML = '';
+    searchResults.style.display = 'none';
+
+    map.flyTo({
+      center: [feat.lng, feat.lat],
+      zoom: 16,
+      speed: 1.5,
+      essential: true
+    });
+
+    updatePanel(feat);
+  }
 
   searchBox.addEventListener('input', (e) => {
     const query = e.target.value;
     searchResults.innerHTML = '';
     searchResults.style.display = 'none';
+    lastMatches = [];
 
     if (query.trim().length < 2) return;
 
@@ -19,6 +36,7 @@ export async function initSearch(map) {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         const matches = await res.json();
+        lastMatches = matches;
 
         if (matches.length > 0) {
           searchResults.style.display = 'block';
@@ -29,18 +47,7 @@ export async function initSearch(map) {
             li.innerHTML = `${typeIcon} <strong>${feat.name}</strong> <small>(${feat.elevation} m)</small>`;
             
             li.addEventListener('click', () => {
-              searchBox.value = feat.name;
-              searchResults.innerHTML = '';
-              searchResults.style.display = 'none';
-              
-              map.flyTo({ 
-                center: [feat.lng, feat.lat], 
-                zoom: 14, 
-                speed: 1.5, 
-                essential: true 
-              });
-              
-              updatePanel(feat);
+              goToFeature(feat);
             });
             
             searchResults.appendChild(li);
@@ -50,6 +57,13 @@ export async function initSearch(map) {
         console.error("Error searching PostGIS DB: ", err);
       }
     }, 300); // Wait 300ms after user stops typing
+  });
+
+  searchBox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && lastMatches.length > 0) {
+      e.preventDefault();
+      goToFeature(lastMatches[0]);
+    }
   });
 
   // Hide dropdown if clicked outside

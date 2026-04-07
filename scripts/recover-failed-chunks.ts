@@ -123,13 +123,14 @@ async function recoverTrails() {
           });
         }
         success = true;
-      } catch (error: any) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         retries--;
         if (retries > 0) {
           console.log(`   [WARN] Network Error. Waiting 30s...`);
           await delay(30000);
         } else {
-          console.error(`   [ERROR] Failed micro-chunk permanently:`, error.message);
+          console.error(`   [ERROR] Failed micro-chunk permanently:`, errorMessage);
         }
       }
     }
@@ -146,7 +147,10 @@ async function recoverTrails() {
         ON CONFLICT (osm_id) DO NOTHING;
       `, [ feature.properties.id, feature.properties.name, feature.properties.sac_scale, JSON.stringify(feature.geometry) ]);
       inserted++;
-    } catch (e) {}
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      console.error(`[WARN] Failed to insert recovered trail ${feature.properties.id}: ${errorMessage}`);
+    }
   }
 
   console.log(`[OK] Recovery Complete. Saved ${inserted} paths to the database!`);

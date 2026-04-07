@@ -5,6 +5,17 @@ import { Pool } from 'pg';
 
 const fastify = Fastify({ logger: true });
 
+type BBoxQuery = {
+  minLng?: string;
+  minLat?: string;
+  maxLng?: string;
+  maxLat?: string;
+};
+
+type SearchQuery = {
+  q?: string;
+};
+
 // Setup PostgreSQL pool
 const pool = new Pool({
   user: 'mountain_worker',
@@ -16,7 +27,7 @@ const pool = new Pool({
 
 // Spatial API Endpoint for Trails
 fastify.get('/api/trails', async (request, reply) => {
-  const { minLng, minLat, maxLng, maxLat } = request.query as any;
+  const { minLng, minLat, maxLng, maxLat } = request.query as BBoxQuery;
 
   if (!minLng || !minLat || !maxLng || !maxLat) {
     return { type: 'FeatureCollection', features: [] };
@@ -48,7 +59,7 @@ fastify.get('/api/trails', async (request, reply) => {
 });
 // Spatial API Endpoint for POIs
 fastify.get('/api/pois', async (request, reply) => {
-  const { minLng, minLat, maxLng, maxLat } = request.query as any;
+  const { minLng, minLat, maxLng, maxLat } = request.query as BBoxQuery;
 
   if (!minLng || !minLat || !maxLng || !maxLat) {
     return { type: 'FeatureCollection', features: [] };
@@ -83,7 +94,7 @@ fastify.get('/api/pois', async (request, reply) => {
 
 // Search API Endpoint for the Autocomplete box
 fastify.get('/api/search', async (request, reply) => {
-  const { q } = request.query as any;
+  const { q } = request.query as SearchQuery;
 
   if (!q || q.length < 2) {
     return [];
@@ -94,7 +105,7 @@ fastify.get('/api/search', async (request, reply) => {
     SELECT id, osm_id, type, name, elevation, ST_X(geom) as lng, ST_Y(geom) as lat
     FROM pois
     WHERE name ILIKE $1
-    LIMIT 10;
+    LIMIT 20;
   `;
 
   try {
