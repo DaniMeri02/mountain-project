@@ -9,6 +9,7 @@ let latestFetchToken = 0;
 // while awaiting the next viewport response.
 const trailFeatureCache = new Map();
 const poiFeatureCache = new Map();
+const ferrataFeatureCache = new Map();
 
 function featureKey(feature) {
   const props = feature && feature.properties ? feature.properties : {};
@@ -177,6 +178,73 @@ export function addMapLayers(map) {
       }
     }, trailsBeforeLayerId);
   }
+
+  // Add via ferrata data source
+  if (!map.getSource('mountain-ferrata')) {
+    map.addSource('mountain-ferrata', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      buffer: 256,
+      lineMetrics: true
+    });
+  }
+
+  // Add via ferrata visual layer
+  if (!map.getLayer('ferrata-lines')) {
+    const isVisible = 'visible';
+
+    const styleLayers = map.getStyle().layers || [];
+    const labelAnchorIds = [
+      'road-label',
+      'poi-label',
+      'mountain_peak-label',
+      'settlement-label',
+      'place-label'
+    ];
+    const explicitAnchor = styleLayers.find((layer) => labelAnchorIds.includes(layer.id));
+    const firstSymbolLayer = styleLayers.find((layer) => layer.type === 'symbol');
+    const ferrataBeforeLayerId = (explicitAnchor && explicitAnchor.id) || (firstSymbolLayer && firstSymbolLayer.id);
+
+    map.addLayer({
+      id: 'ferrata-lines',
+      type: 'line',
+      source: 'mountain-ferrata',
+      minzoom: 11,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        'visibility': isVisible
+      },
+      paint: {
+        'line-color': [
+          'match',
+          ['get', 'via_ferrata_scale'],
+          'A', '#ffcc80',
+          'B', '#ffab40',
+          'C', '#ff8f00',
+          'D', '#ff6f00',
+          'E', '#e65100',
+          'F', '#bf360c',
+          '1', '#ffab40',
+          '2', '#ff8f00',
+          '3', '#ff6f00',
+          '4', '#e65100',
+          '5', '#bf360c',
+          '6', '#8d1b00',
+          '#f4511e'
+        ],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          10, 1.5,
+          14, 2.5,
+          18, 4,
+          22, 6
+        ],
+        'line-opacity': 0.95,
+        'line-dasharray': [1.3, 1.1]
+      }
+    }, ferrataBeforeLayerId);
+  }
 } // matches the original close of addMapLayers
 
 // Live database fetcher based on current screen viewport!
@@ -197,24 +265,34 @@ export async function fetchDynamicData(map) {
   try {
     const trailsUrl = `/api/trails?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
     const poisUrl = `/api/pois?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
-    const [trailsRes, poisRes] = await Promise.all([fetch(trailsUrl), fetch(poisUrl)]);
+    const ferrataUrl = `/api/ferrata?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
+    const [trailsRes, poisRes, ferrataRes] = await Promise.all([fetch(trailsUrl), fetch(poisUrl), fetch(ferrataUrl)]);
 
     // Ignore stale responses from previous zoom/pan requests.
     if (fetchToken !== latestFetchToken) return;
 
+    if (!trailsRes.ok || !poisRes.ok || !ferrataRes.ok) {
+      throw new Error(`HTTP error while loading layers: trails=${trailsRes.status}, pois=${poisRes.status}, ferrata=${ferrataRes.status}`);
+    }
+
     const trailsData = await trailsRes.json();
     const poisData = await poisRes.json();
+    const ferrataData = await ferrataRes.json();
 
     // Merge new viewport data into cache to prevent brief/empty responses
     // from wiping already visible features during zoom transitions.
     mergeIntoCache(trailFeatureCache, trailsData && trailsData.features ? trailsData.features : []);
     mergeIntoCache(poiFeatureCache, poisData && poisData.features ? poisData.features : []);
+    mergeIntoCache(ferrataFeatureCache, ferrataData && ferrataData.features ? ferrataData.features : []);
 
     if (map.getSource('mountain-trails')) {
       map.getSource('mountain-trails').setData(cacheToFeatureCollection(trailFeatureCache));
     }
     if (map.getSource('mountain-pois')) {
       map.getSource('mountain-pois').setData(cacheToFeatureCollection(poiFeatureCache));
+    }
+    if (map.getSource('mountain-ferrata')) {
+      map.getSource('mountain-ferrata').setData(cacheToFeatureCollection(ferrataFeatureCache));
     }
   } catch (error) {
     console.error("Error fetching live trails from DB:", error);
@@ -266,6 +344,15 @@ export function setupStyleSwitcher(map) {
     toggleTrailsBtn.addEventListener('change', (e) => {
       if (map.getLayer('trails-lines')) {
         map.setLayoutProperty('trails-lines', 'visibility', e.target.checked ? 'visible' : 'none');
+      }
+    });
+  }
+
+  const toggleFerrataBtn = document.getElementById('toggle-ferrata');
+  if (toggleFerrataBtn) {
+    toggleFerrataBtn.addEventListener('change', (e) => {
+      if (map.getLayer('ferrata-lines')) {
+        map.setLayoutProperty('ferrata-lines', 'visibility', e.target.checked ? 'visible' : 'none');
       }
     });
   }

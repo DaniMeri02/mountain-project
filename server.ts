@@ -23,6 +23,23 @@ type ParsedBBox = {
   maxLat: number;
 };
 
+type ErrorWithCode = {
+  code?: string;
+};
+
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const maybeError = error as ErrorWithCode;
+  if (typeof maybeError.code === 'string') {
+    return maybeError.code;
+  }
+
+  return undefined;
+}
+
 function parseBBox(query: BBoxQuery): ParsedBBox | null {
   const minLng = Number(query.minLng);
   const minLat = Number(query.minLat);
@@ -81,6 +98,51 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/trails', async (request, reply) =>
     reply.status(500).send({ error: 'Database query failed' });
   }
 });
+
+// Spatial API Endpoint for Via Ferrata lines
+fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) => {
+  const bbox = parseBBox(request.query);
+
+  if (!bbox) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+
+  const query = `
+    SELECT json_build_object(
+      'type', 'FeatureCollection',
+      'features', COALESCE(json_agg(
+        json_build_object(
+          'type', 'Feature',
+          'geometry', ST_AsGeoJSON(geom)::json,
+          'properties', json_build_object(
+            'id', id,
+            'osm_id', osm_id,
+            'name', name,
+            'via_ferrata_scale', via_ferrata_scale,
+            'sac_scale', sac_scale,
+            'source_type', source_type
+          )
+        )
+      ), '[]'::json)
+    ) AS geojson
+    FROM via_ferrata
+    WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
+  `;
+
+  try {
+    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
+  } catch (error) {
+    if (getErrorCode(error) === '42P01') {
+      fastify.log.warn('Table "via_ferrata" not found yet. Returning empty dataset.');
+      return { type: 'FeatureCollection', features: [] };
+    }
+
+    fastify.log.error(error);
+    reply.status(500).send({ error: 'Database query failed' });
+  }
+});
+
 // Spatial API Endpoint for POIs
 fastify.get<{ Querystring: BBoxQuery }>('/api/pois', async (request, reply) => {
   const bbox = parseBBox(request.query);

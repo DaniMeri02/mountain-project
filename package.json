@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
+    "fetch:ferrata": "tsx scripts/fetch-via-ferrata.ts",
     "build": "esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js",
     "start": "node dist/server.js"
   },
