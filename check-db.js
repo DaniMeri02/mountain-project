@@ -22,9 +22,9 @@ const FAILED_BBOXES = [
 async function checkDB() {
   try {
     const totalRes = await pool.query('SELECT COUNT(*) FROM trails');
-    console.log(`\n[INFO] TOTAL TRAILS IN DATABASE: ${totalRes.rows[0].count}`);
+    console.log(`\n📊 TOTAL TRAILS IN DATABASE: ${totalRes.rows[0].count}`);
 
-    console.log('\n[INFO] CHECKING PREVIOUSLY FAILED CHUNKS...');
+    console.log('\n🔍 CHECKING PREVIOUSLY FAILED CHUNKS...');
     for (const b of FAILED_BBOXES) {
       const q = `
         SELECT COUNT(*) 
@@ -39,7 +39,7 @@ async function checkDB() {
       console.log(`Chunk ${b.bbox} -> ${res.rows[0].count} trails found.`);
     }
 
-    console.log('\n[OK] CHECK COMPLETE!');
+    console.log('\n✅ CHECK COMPLETE!');
   } catch (e) {
     console.error('Error:', e);
   } finally {

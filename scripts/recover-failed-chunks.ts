@@ -41,13 +41,13 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function recoverTrails() {
-  console.log(`\n[INFO] Recovering ${failedBoxes.length} failed chunks by splitting them into ${MICRO_BBOXES.length} micro-chunks...`);
+  console.log(`\n🛠️ Recovering ${failedBoxes.length} failed chunks by splitting them into ${MICRO_BBOXES.length} micro-chunks...`);
   
   const allFeatures = [];
 
   for (let i = 0; i < MICRO_BBOXES.length; i++) {
     const bbox = MICRO_BBOXES[i];
-    console.log(`\n[INFO] Fetching Micro-Chunk ${i + 1}/${MICRO_BBOXES.length}: ${bbox}`);
+    console.log(`\n📦 Fetching Micro-Chunk ${i + 1}/${MICRO_BBOXES.length}: ${bbox}`);
 
     if (i > 0) {
       await delay(15000); // 15s wait to avoid rate limit
@@ -77,7 +77,7 @@ async function recoverTrails() {
 
         if (response.status === 429 || response.status === 504) {
           const waitTime = response.status === 429 ? 120000 : 30000;
-          console.log(`   [WARN] HTTP ${response.status}. Waiting ${waitTime/1000}s... (${retries - 1} retries left)`);
+          console.log(`   ⚠️ HTTP ${response.status}. Waiting ${waitTime/1000}s... (${retries - 1} retries left)`);
           await delay(waitTime);
           retries--;
           continue;
@@ -86,7 +86,7 @@ async function recoverTrails() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
-        console.log(`   [OK] Found ${data.elements?.length || 0} OpenStreetMap elements.`);
+        console.log(`   ✅ Found ${data.elements?.length || 0} OpenStreetMap elements.`);
         
         const nodes = new Map();
         const ways = [];
@@ -127,16 +127,16 @@ async function recoverTrails() {
         const errorMessage = error instanceof Error ? error.message : String(error);
         retries--;
         if (retries > 0) {
-          console.log(`   [WARN] Network Error. Waiting 30s...`);
+          console.log(`   ⚠️ Network Error. Waiting 30s...`);
           await delay(30000);
         } else {
-          console.error(`   [ERROR] Failed micro-chunk permanently:`, errorMessage);
+          console.error(`   ❌ Failed micro-chunk permanently:`, errorMessage);
         }
       }
     }
   }
 
-  console.log(`\n[INFO] Found ${allFeatures.length} trails in the recovered zones. Inserting into Database...`);
+  console.log(`\n💾 Found ${allFeatures.length} trails in the recovered zones. Inserting into Database...`);
   
   let inserted = 0;
   for (const feature of allFeatures) {
@@ -149,11 +149,11 @@ async function recoverTrails() {
       inserted++;
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error(`[WARN] Failed to insert recovered trail ${feature.properties.id}: ${errorMessage}`);
+      console.error(`⚠️ Failed to insert recovered trail ${feature.properties.id}: ${errorMessage}`);
     }
   }
 
-  console.log(`[OK] Recovery Complete. Saved ${inserted} paths to the database!`);
+  console.log(`✅ Recovery Complete. Saved ${inserted} paths to the database!`);
   await pool.end();
 }
 

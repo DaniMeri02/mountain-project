@@ -16,6 +16,30 @@ type SearchQuery = {
   q?: string;
 };
 
+type ParsedBBox = {
+  minLng: number;
+  minLat: number;
+  maxLng: number;
+  maxLat: number;
+};
+
+function parseBBox(query: BBoxQuery): ParsedBBox | null {
+  const minLng = Number(query.minLng);
+  const minLat = Number(query.minLat);
+  const maxLng = Number(query.maxLng);
+  const maxLat = Number(query.maxLat);
+
+  if (![minLng, minLat, maxLng, maxLat].every(Number.isFinite)) {
+    return null;
+  }
+
+  if (minLng >= maxLng || minLat >= maxLat) {
+    return null;
+  }
+
+  return { minLng, minLat, maxLng, maxLat };
+}
+
 // Setup PostgreSQL pool
 const pool = new Pool({
   user: 'mountain_worker',
@@ -26,10 +50,10 @@ const pool = new Pool({
 });
 
 // Spatial API Endpoint for Trails
-fastify.get('/api/trails', async (request, reply) => {
-  const { minLng, minLat, maxLng, maxLat } = request.query as BBoxQuery;
+fastify.get<{ Querystring: BBoxQuery }>('/api/trails', async (request, reply) => {
+  const bbox = parseBBox(request.query);
 
-  if (!minLng || !minLat || !maxLng || !maxLat) {
+  if (!bbox) {
     return { type: 'FeatureCollection', features: [] };
   }
 
@@ -50,18 +74,18 @@ fastify.get('/api/trails', async (request, reply) => {
   `;
 
   try {
-    const result = await pool.query(query, [minLng, minLat, maxLng, maxLat]);
-    return result.rows[0].geojson;
+    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
   } catch (error) {
     fastify.log.error(error);
     reply.status(500).send({ error: 'Database query failed' });
   }
 });
 // Spatial API Endpoint for POIs
-fastify.get('/api/pois', async (request, reply) => {
-  const { minLng, minLat, maxLng, maxLat } = request.query as BBoxQuery;
+fastify.get<{ Querystring: BBoxQuery }>('/api/pois', async (request, reply) => {
+  const bbox = parseBBox(request.query);
 
-  if (!minLng || !minLat || !maxLng || !maxLat) {
+  if (!bbox) {
     return { type: 'FeatureCollection', features: [] };
   }
 
@@ -84,8 +108,8 @@ fastify.get('/api/pois', async (request, reply) => {
   `;
 
   try {
-    const result = await pool.query(query, [minLng, minLat, maxLng, maxLat]);
-    return result.rows[0].geojson;
+    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
   } catch (error) {
     fastify.log.error(error);
     reply.status(500).send({ error: 'Database query failed' });
@@ -93,8 +117,8 @@ fastify.get('/api/pois', async (request, reply) => {
 });
 
 // Search API Endpoint for the Autocomplete box
-fastify.get('/api/search', async (request, reply) => {
-  const { q } = request.query as SearchQuery;
+fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) => {
+  const { q } = request.query;
 
   if (!q || q.length < 2) {
     return [];
@@ -119,8 +143,12 @@ fastify.get('/api/search', async (request, reply) => {
 
 // Register the plugin to serve static files from the 'public' folder
 fastify.register(fastifyStatic, {
-  root: path.join(__dirname, 'public'),
+  root: path.join(process.cwd(), 'public'),
   prefix: '/', 
+});
+
+fastify.addHook('onClose', async () => {
+  await pool.end();
 });
 
 const start = async () => {

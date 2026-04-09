@@ -11,7 +11,7 @@ const pool = new Pool({
 });
 
 async function importPois() {
-  console.log("[INFO] Loading pois.geojson file...");
+  console.log("📥 Loading pois.geojson file...");
   try {
     const rawData = await fs.readFile(path.join(__dirname, '../public/data/pois.geojson'), 'utf8');
     const featureCollection = JSON.parse(rawData);
@@ -48,10 +48,10 @@ async function importPois() {
       }
     }
     
-    console.log(`[OK] Upserted ${inserted} POIs into the database.`);
+    console.log(`✅ Upserted ${inserted} POIs into the database.`);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error("[ERROR] Error reading or parsing pois.geojson:", errorMessage);
+    console.error("❌ Error reading or parsing pois.geojson:", errorMessage);
   } finally {
     await pool.end();
   }

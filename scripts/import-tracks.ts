@@ -27,11 +27,11 @@ type OverpassPoint = {
 };
 
 async function fetchTracks() {
-  console.log(`[INFO] Downloading trail-like paths (track, footway, bridleway, steps, cycleway) in ${BBOXES.length} chunks...`);
+  console.log(`🌐 Downloading trail-like paths (track, footway, bridleway, steps, cycleway) in ${BBOXES.length} chunks...`);
   
   for (let i = 0; i < BBOXES.length; i++) {
     const bbox = BBOXES[i];
-    console.log(`\n[INFO] Fetching Chunk ${i + 1}/${BBOXES.length} for extent: ${bbox}`);
+    console.log(`\n📦 Fetching Chunk ${i + 1}/${BBOXES.length} for extent: ${bbox}`);
     
     // Add common OSM trail-like highway classes that are often visible in base maps.
     // This helps reduce "missing trail" perception at high zoom.
@@ -64,7 +64,7 @@ async function fetchTracks() {
 
         if (response.status === 429 || response.status === 504) {
           const waitTime = response.status === 429 ? 30000 : 15000;
-          console.log(`   [WARN] Got HTTP ${response.status}. Retrying in ${waitTime/1000}s...`);
+          console.log(`   ⚠️ Got HTTP ${response.status}. Retrying in ${waitTime/1000}s...`);
           await delay(waitTime);
           retries--;
           continue;
@@ -99,23 +99,23 @@ async function fetchTracks() {
           }
         }
         
-        console.log(`   [OK] Inserted ${inserted} new trail-like ways into DB for chunk ${i+1}.`);
+        console.log(`   ✅ Inserted ${inserted} new trail-like ways into DB for chunk ${i+1}.`);
         success = true;
 
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         retries--;
         if (retries > 0) {
-          console.log(`   [WARN] Network error (${errorMessage}). Retrying in 10s...`);
+          console.log(`   ⚠️ Network error (${errorMessage}). Retrying in 10s...`);
           await delay(10000);
         } else {
-          console.error(`   [ERROR] Failed Chunk ${i+1} entirely! Extent: ${bbox}`);
+          console.error(`   ❌ Failed Chunk ${i+1} entirely! Extent: ${bbox}`);
         }
       }
     }
   }
   
-  console.log(`\n[INFO] All chunks processed! Checking total records...`);
+  console.log(`\n🔎 All chunks processed! Checking total records...`);
   const countRes = await pool.query('SELECT COUNT(*) FROM trails');
   console.log(`Total lines in DB is now: ${countRes.rows[0].count}`);
   

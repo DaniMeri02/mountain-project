@@ -9,7 +9,7 @@ const pool = new Pool({
 });
 
 async function checkCoverage() {
-  console.log("[INFO] Scanning the entire map area for missing chunks...");
+  console.log("🔍 Scanning the entire map area for missing chunks...");
   
   const startLat = 45.3;
   const endLat = 46.8;
@@ -54,7 +54,7 @@ async function checkCoverage() {
       totalTrails += count;
       
       if (count === 0) {
-        console.log(`[WARN] EMPTY CHUNK FOUND: Lat [${b.minLat} to ${b.maxLat}], Lon [${b.minLon} to ${b.maxLon}]`);
+        console.log(`⚠️ EMPTY CHUNK FOUND: Lat [${b.minLat} to ${b.maxLat}], Lon [${b.minLon} to ${b.maxLon}]`);
         emptyChunks++;
       }
     } catch (err) {
@@ -64,9 +64,9 @@ async function checkCoverage() {
 
   console.log('----------------------------------------------------');
   if (emptyChunks === 0) {
-    console.log(`[OK] 100% COVERAGE CONFIRMED! All ${BBOXES.length} sections have trails.`);
+    console.log(`✅ 100% COVERAGE CONFIRMED! All ${BBOXES.length} sections have trails.`);
   } else {
-    console.log(`[WARN] ${emptyChunks} out of ${BBOXES.length} sections are completely empty!`);
+    console.log(`⚠️ ${emptyChunks} out of ${BBOXES.length} sections are completely empty!`);
   }
   console.log('----------------------------------------------------');
   

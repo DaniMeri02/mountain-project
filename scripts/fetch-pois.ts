@@ -19,7 +19,7 @@ out center; // Overpass calculates the centroid (coordinates) even for ways/buil
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
 async function fetchPOIs() {
-  console.log('í¿”ï¸ Downloading data from OpenStreetMap (Overpass API)...');
+  console.log('ğŸ”ï¸ Downloading data from OpenStreetMap (Overpass API)...');
 
   try {
     const response = await fetch(OVERPASS_URL, {
@@ -96,7 +96,7 @@ async function fetchPOIs() {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(geojson, null, 2));
 
-    console.log(`í·ºï¸ Saved ${features.length} Points of Interest to ${outputPath}`);
+    console.log(`ğŸ—ºï¸ Saved ${features.length} Points of Interest to ${outputPath}`);
 
   } catch (error) {
     console.error('âŒ Error during fetch:', error);
