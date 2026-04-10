@@ -1,9 +1,19 @@
 export function updatePanel(props) {
   const panel = document.getElementById('panel');
   
-  const typeCapitalized = props.type.charAt(0).toUpperCase() + props.type.slice(1);
+  const typeLabel = typeof props.type === 'string' ? props.type : 'unknown';
+  const typeCapitalized = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
   const descHTML = props.description ? `<p>${props.description}</p>` : `<p><em>No description available.</em></p>`;
   const siteHTML = props.website ? `<p><a href="${props.website}" target="_blank">Visit website</a></p>` : '';
+  const hasElevation = props.elevation !== null && props.elevation !== undefined && props.elevation !== '' && props.elevation !== 'N/D';
+  const elevationText = hasElevation
+    ? (typeof props.elevation === 'number' ? `${props.elevation}m asl` : String(props.elevation))
+    : '';
+  const elevationBadgeHTML = hasElevation
+    ? `<span style="background-color: #7f8c8d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
+        ${elevationText}
+      </span>`
+    : '';
 
   panel.innerHTML = `
     <h2>${props.name}</h2>
@@ -11,9 +21,7 @@ export function updatePanel(props) {
       <span style="background-color: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
         ${typeCapitalized}
       </span>
-      <span style="background-color: #7f8c8d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
-        ${props.elevation}m asl
-      </span>
+      ${elevationBadgeHTML}
     </div>
     ${descHTML}
     ${siteHTML}

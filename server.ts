@@ -108,6 +108,46 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) =
   }
 
   const query = `
+    WITH ferrata_rows AS (
+      SELECT
+        id,
+        osm_id,
+        name,
+        via_ferrata_scale,
+        sac_scale,
+        source_type,
+        geom
+      FROM via_ferrata
+
+      UNION ALL
+
+      SELECT
+        NULL::bigint AS id,
+        t.osm_id,
+        t.name,
+        NULL::text AS via_ferrata_scale,
+        t.sac_scale,
+        'name:ferrata'::text AS source_type,
+        t.geom
+      FROM trails t
+      WHERE
+        (
+          t.name ILIKE 'ferrata %'
+          OR t.name ILIKE '% via ferrata %'
+          OR t.name ILIKE '%ferrata%'
+        )
+        AND t.sac_scale IN (
+          'demanding_mountain_hiking',
+          'alpine_hiking',
+          'demanding_alpine_hiking',
+          'difficult_alpine_hiking'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM via_ferrata vf
+          WHERE vf.osm_id = t.osm_id
+        )
+    )
     SELECT json_build_object(
       'type', 'FeatureCollection',
       'features', COALESCE(json_agg(
@@ -125,7 +165,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) =
         )
       ), '[]'::json)
     ) AS geojson
-    FROM via_ferrata
+    FROM ferrata_rows
     WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
   `;
 
@@ -186,18 +226,131 @@ fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) 
     return [];
   }
 
-  // Find POIs matching the search name, pulling their coordinates using ST_X and ST_Y
+  const searchTerm = q.trim();
+  const searchPattern = `%${searchTerm}%`;
+
   const query = `
-    SELECT id, osm_id, type, name, elevation, ST_X(geom) as lng, ST_Y(geom) as lat
-    FROM pois
-    WHERE name ILIKE $1
+    WITH poi_matches AS (
+      SELECT
+        id,
+        osm_id,
+        type,
+        name,
+        elevation,
+        ST_X(geom) AS lng,
+        ST_Y(geom) AS lat,
+        NULL::text AS via_ferrata_scale,
+        NULL::text AS source_type
+      FROM pois
+      WHERE name ILIKE $1
+    ),
+    ferrata_rows AS (
+      SELECT
+        osm_id,
+        name,
+        via_ferrata_scale,
+        source_type,
+        geom
+      FROM via_ferrata
+
+      UNION ALL
+
+      SELECT
+        t.osm_id,
+        t.name,
+        NULL::text AS via_ferrata_scale,
+        'name:ferrata'::text AS source_type,
+        t.geom
+      FROM trails t
+      WHERE
+        (
+          t.name ILIKE 'ferrata %'
+          OR t.name ILIKE '% via ferrata %'
+          OR t.name ILIKE '%ferrata%'
+        )
+        AND t.sac_scale IN (
+          'demanding_mountain_hiking',
+          'alpine_hiking',
+          'demanding_alpine_hiking',
+          'difficult_alpine_hiking'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM via_ferrata vf
+          WHERE vf.osm_id = t.osm_id
+        )
+    ),
+    ferrata_matches AS (
+      SELECT
+        NULL::bigint AS id,
+        MIN(osm_id) AS osm_id,
+        'ferrata'::text AS type,
+        name,
+        NULL::integer AS elevation,
+        ST_X(ST_Centroid(ST_Collect(geom))) AS lng,
+        ST_Y(ST_Centroid(ST_Collect(geom))) AS lat,
+        MIN(via_ferrata_scale) FILTER (WHERE via_ferrata_scale IS NOT NULL) AS via_ferrata_scale,
+        CASE
+          WHEN BOOL_OR(source_type <> 'name:ferrata') THEN 'via_ferrata'
+          ELSE 'name:ferrata'
+        END AS source_type
+      FROM ferrata_rows
+      WHERE name IS NOT NULL
+        AND name ILIKE $1
+      GROUP BY name
+    ),
+    combined AS (
+      SELECT * FROM poi_matches
+      UNION ALL
+      SELECT * FROM ferrata_matches
+    )
+    SELECT
+      id,
+      osm_id,
+      type,
+      name,
+      elevation,
+      lng,
+      lat,
+      via_ferrata_scale,
+      source_type
+    FROM combined
+    ORDER BY
+      CASE
+        WHEN LOWER(name) = LOWER($2) THEN 0
+        WHEN LOWER(name) LIKE LOWER($2) || '%' THEN 1
+        ELSE 2
+      END,
+      name
     LIMIT 20;
   `;
 
   try {
-    const result = await pool.query(query, [`%${q}%`]);
+    const result = await pool.query(query, [searchPattern, searchTerm]);
     return result.rows;
   } catch (error) {
+    if (getErrorCode(error) === '42P01') {
+      // If ferrata tables are missing, gracefully keep POI search working.
+      const fallbackQuery = `
+        SELECT
+          id,
+          osm_id,
+          type,
+          name,
+          elevation,
+          ST_X(geom) AS lng,
+          ST_Y(geom) AS lat,
+          NULL::text AS via_ferrata_scale,
+          NULL::text AS source_type
+        FROM pois
+        WHERE name ILIKE $1
+        LIMIT 20;
+      `;
+
+      const fallback = await pool.query(fallbackQuery, [searchPattern]);
+      return fallback.rows;
+    }
+
     fastify.log.error(error);
     reply.status(500).send({ error: 'Search query failed' });
   }
