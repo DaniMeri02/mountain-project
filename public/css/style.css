@@ -279,3 +279,36 @@ body.map-fullscreen #panel {
   background: linear-gradient(135deg, #d35400, #c0392b);
 }
 
+.map-click-ping {
+  position: relative;
+  width: 14px;
+  height: 22px;
+}
+
+.map-click-ping::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: #6f7780;
+  border: 2px solid #f5f7fa;
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+}
+
+.map-click-ping::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 8px solid #6f7780;
+}
+

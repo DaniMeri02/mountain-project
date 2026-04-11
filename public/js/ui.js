@@ -1,17 +1,61 @@
-export function updatePanel(props) {
+function formatElevationLabel(elevation) {
+  const numericElevation = Number(elevation);
+  if (Number.isFinite(numericElevation) && numericElevation > 0) {
+    return `${Math.round(numericElevation)}m asl`;
+  }
+
+  if (typeof elevation === 'string') {
+    const trimmed = elevation.trim();
+    if (!trimmed || trimmed === 'N/D') return '';
+
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return `${Math.round(parsed)}m asl`;
+    }
+
+    if (!Number.isFinite(parsed)) {
+      return trimmed;
+    }
+  }
+
+  return '';
+}
+
+function renderAltitudeText(elevation, isLoading) {
+  if (isLoading) {
+    return '<em>Loading...</em>';
+  }
+
+  const numericElevation = Number(elevation);
+  if (Number.isFinite(numericElevation) && numericElevation > 0) {
+    return `${Math.round(numericElevation)}m asl`;
+  }
+
+  return 'Not available';
+}
+
+export function updatePanel(props, coordinates) {
   const panel = document.getElementById('panel');
   
   const typeLabel = typeof props.type === 'string' ? props.type : 'unknown';
   const typeCapitalized = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
   const descHTML = props.description ? `<p>${props.description}</p>` : `<p><em>No description available.</em></p>`;
   const siteHTML = props.website ? `<p><a href="${props.website}" target="_blank">Visit website</a></p>` : '';
-  const hasElevation = props.elevation !== null && props.elevation !== undefined && props.elevation !== '' && props.elevation !== 'N/D';
-  const elevationText = hasElevation
-    ? (typeof props.elevation === 'number' ? `${props.elevation}m asl` : String(props.elevation))
-    : '';
+  const elevationText = formatElevationLabel(props.elevation);
+  const hasElevation = elevationText !== '';
   const elevationBadgeHTML = hasElevation
     ? `<span style="background-color: #7f8c8d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
         ${elevationText}
+      </span>`
+    : '';
+  const hasCoordinates = coordinates
+    && Number.isFinite(Number(coordinates.lat))
+    && Number.isFinite(Number(coordinates.lng));
+  const latFixed = hasCoordinates ? Number(coordinates.lat).toFixed(6) : '';
+  const lngFixed = hasCoordinates ? Number(coordinates.lng).toFixed(6) : '';
+  const coordinateBadgeHTML = hasCoordinates
+    ? `<span style="background-color: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
+        ${latFixed}, ${lngFixed}
       </span>`
     : '';
 
@@ -22,6 +66,7 @@ export function updatePanel(props) {
         ${typeCapitalized}
       </span>
       ${elevationBadgeHTML}
+      ${coordinateBadgeHTML}
     </div>
     ${descHTML}
     ${siteHTML}
@@ -78,5 +123,27 @@ export function updatePanel(props) {
       }
     });
   }
+}
+
+export function updateCoordinatesPanel(lng, lat, elevation, isLoading = false) {
+  const panel = document.getElementById('panel');
+  const latFixed = Number(lat).toFixed(6);
+  const lngFixed = Number(lng).toFixed(6);
+  const altitudeText = renderAltitudeText(elevation, isLoading);
+
+  panel.innerHTML = `
+    <h2>Clicked Coordinates</h2>
+    <div style="margin-bottom: 20px;">
+      <span style="background-color: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
+        Map Click
+      </span>
+    </div>
+    <p style="margin: 0 0 10px 0;"><strong>Altitude:</strong> ${altitudeText}</p>
+    <p style="margin: 0 0 10px 0;"><strong>Latitude:</strong> ${latFixed}</p>
+    <p style="margin: 0 0 10px 0;"><strong>Longitude:</strong> ${lngFixed}</p>
+    <p style="margin: 0; color: #666; font-size: 0.9rem;">
+      Decimal format: ${latFixed}, ${lngFixed}
+    </p>
+  `;
 }
 

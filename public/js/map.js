@@ -1,9 +1,11 @@
 import { loadIcons } from './icons.js';
-import { updatePanel } from './ui.js';
+import { updatePanel, updateCoordinatesPanel } from './ui.js';
 
 // We store the current selection to know if 3D should be applied after a style loads
 let currentMode = 'outdoors-v12';
 let latestFetchToken = 0;
+let latestPanelUpdateToken = 0;
+let transientClickMarker = null;
 
 // Cache features by OSM id so zoom transitions do not blank the layer
 // while awaiting the next viewport response.
@@ -31,20 +33,119 @@ function cacheToFeatureCollection(cache) {
   };
 }
 
+function ensureTerrainSource(map) {
+  if (map.getSource('mapbox-dem')) return;
+
+  map.addSource('mapbox-dem', {
+    type: 'raster-dem',
+    url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+    tileSize: 512,
+    maxzoom: 14
+  });
+}
+
+function hasValidElevationValue(elevation) {
+  const numericElevation = Number(elevation);
+  if (Number.isFinite(numericElevation)) {
+    return numericElevation > 0;
+  }
+
+  if (typeof elevation === 'string') {
+    const trimmed = elevation.trim();
+    return trimmed !== '' && trimmed !== 'N/D';
+  }
+
+  return false;
+}
+
+function queryElevationFromTerrain(map, coordinates) {
+  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
+    return null;
+  }
+
+  const value = map.queryTerrainElevation([coordinates.lng, coordinates.lat], { exaggerated: false });
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value);
+}
+
+async function resolveElevationFromCoordinates(map, coordinates) {
+  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
+    return null;
+  }
+
+  // Terrain tiles are streamed; brief retries avoid empty values when data is still loading.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const elevation = queryElevationFromTerrain(map, coordinates);
+    if (elevation !== null) {
+      return elevation;
+    }
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 140);
+    });
+  }
+
+  return null;
+}
+
+function getFeatureCoordinates(feature, fallbackLngLat) {
+  const geometry = feature && feature.geometry;
+  if (geometry && geometry.type === 'Point' && Array.isArray(geometry.coordinates)) {
+    const [lng, lat] = geometry.coordinates;
+    if (Number.isFinite(Number(lng)) && Number.isFinite(Number(lat))) {
+      return { lng: Number(lng), lat: Number(lat) };
+    }
+  }
+
+  if (
+    fallbackLngLat
+    && Number.isFinite(Number(fallbackLngLat.lng))
+    && Number.isFinite(Number(fallbackLngLat.lat))
+  ) {
+    return { lng: Number(fallbackLngLat.lng), lat: Number(fallbackLngLat.lat) };
+  }
+
+  return null;
+}
+
+function removeTransientClickMarker() {
+  if (transientClickMarker) {
+    transientClickMarker.remove();
+    transientClickMarker = null;
+  }
+}
+
+function upsertTransientClickMarker(map, coordinates) {
+  if (!coordinates) return;
+
+  if (!transientClickMarker) {
+    const markerElement = document.createElement('div');
+    markerElement.className = 'map-click-ping';
+
+    transientClickMarker = new mapboxgl.Marker({
+      element: markerElement,
+      anchor: 'bottom'
+    })
+      .setLngLat([coordinates.lng, coordinates.lat])
+      .addTo(map);
+    return;
+  }
+
+  transientClickMarker.setLngLat([coordinates.lng, coordinates.lat]);
+}
+
 export function addMapLayers(map) {
   // Load custom marker icons
   loadIcons(map);
 
+  // Keep terrain source available so click altitude can be resolved from Mapbox DEM.
+  ensureTerrainSource(map);
+
   // Re-apply 3D Terrain if the selected mode demands it
   if (currentMode === 'satellite-3d') {
-    if (!map.getSource('mapbox-dem')) {
-      map.addSource('mapbox-dem', {
-        'type': 'raster-dem',
-        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        'tileSize': 512,
-        'maxzoom': 14
-      });
-    }
     // Enable 3D terrain with exaggeration
     map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
 
@@ -61,8 +162,8 @@ export function addMapLayers(map) {
       });
     }
   } else {
-    // Reset to flat/top-down logic for non-3D modes (though setStyle clears some natively)
-    map.setTerrain(null);
+    // Keep terrain data queryable while preserving the flat visual style.
+    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 0 });
   }
 
   // Add data source
@@ -308,8 +409,48 @@ export function setupMapInteractivity(map) {
     map.getCanvas().style.cursor = '';
   });
 
-  map.on('click', 'pois-points', (e) => {
-    updatePanel(e.features[0].properties);
+  map.on('click', 'pois-points', async (e) => {
+    removeTransientClickMarker();
+    const panelToken = ++latestPanelUpdateToken;
+
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+
+    const coordinates = getFeatureCoordinates(feature, e.lngLat);
+    const properties = feature.properties ? { ...feature.properties } : {};
+    updatePanel(properties, coordinates);
+
+    if (!coordinates || hasValidElevationValue(properties.elevation)) {
+      return;
+    }
+
+    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates);
+    if (panelToken !== latestPanelUpdateToken || derivedElevation === null) {
+      return;
+    }
+
+    updatePanel({ ...properties, elevation: derivedElevation }, coordinates);
+  });
+
+  map.on('click', async (e) => {
+    // Keep POI click behavior intact; only show raw coordinates on plain map clicks.
+    const poiAtPoint = map.getLayer('pois-points')
+      ? map.queryRenderedFeatures(e.point, { layers: ['pois-points'] })
+      : [];
+    if (poiAtPoint.length > 0) return;
+
+    const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+    const panelToken = ++latestPanelUpdateToken;
+
+    upsertTransientClickMarker(map, coordinates);
+    updateCoordinatesPanel(coordinates.lng, coordinates.lat, null, true);
+
+    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates);
+    if (panelToken !== latestPanelUpdateToken) {
+      return;
+    }
+
+    updateCoordinatesPanel(coordinates.lng, coordinates.lat, derivedElevation, false);
   });
 
   // Listen to map pan/zoom events to dynamically fetch from PostGIS backend

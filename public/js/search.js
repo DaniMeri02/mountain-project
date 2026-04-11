@@ -1,5 +1,86 @@
 import { updatePanel } from './ui.js';
 
+let latestSearchSelectionToken = 0;
+
+function hasValidElevationValue(elevation) {
+  const numericElevation = Number(elevation);
+  if (Number.isFinite(numericElevation)) {
+    return numericElevation > 0;
+  }
+
+  if (typeof elevation === 'string') {
+    const trimmed = elevation.trim();
+    if (!trimmed || trimmed === 'N/D') {
+      return false;
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      return parsed > 0;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function queryElevationFromTerrain(map, coordinates) {
+  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
+    return null;
+  }
+
+  const value = map.queryTerrainElevation([coordinates.lng, coordinates.lat], { exaggerated: false });
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value);
+}
+
+async function resolveElevationFromCoordinates(map, coordinates) {
+  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
+    return null;
+  }
+
+  // DEM tiles may still be loading; retry briefly before giving up.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const elevation = queryElevationFromTerrain(map, coordinates);
+    if (elevation !== null) {
+      return elevation;
+    }
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 140);
+    });
+  }
+
+  return null;
+}
+
+function waitForMapSettle(map, timeoutMs = 1800) {
+  return new Promise((resolve) => {
+    let finished = false;
+
+    const finalize = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      map.off('moveend', onMoveEnd);
+      map.off('idle', onIdle);
+      resolve();
+    };
+
+    const onMoveEnd = () => finalize();
+    const onIdle = () => finalize();
+
+    map.on('moveend', onMoveEnd);
+    map.on('idle', onIdle);
+
+    const timer = window.setTimeout(finalize, timeoutMs);
+  });
+}
+
 export async function initSearch(map) {
   const searchBox = document.getElementById('search-box');
   const searchResults = document.getElementById('search-results');
@@ -62,10 +143,16 @@ export async function initSearch(map) {
     return '📍';
   }
 
-  function goToFeature(feat) {
+  async function goToFeature(feat) {
+    const selectionToken = ++latestSearchSelectionToken;
     searchBox.value = feat.name;
     searchResults.innerHTML = '';
     searchResults.style.display = 'none';
+
+    const coordinates =
+      Number.isFinite(Number(feat.lat)) && Number.isFinite(Number(feat.lng))
+        ? { lat: Number(feat.lat), lng: Number(feat.lng) }
+        : null;
 
     map.flyTo({
       center: [feat.lng, feat.lat],
@@ -74,17 +161,29 @@ export async function initSearch(map) {
       essential: true
     });
 
-    if (feat.type === 'ferrata') {
-      updatePanel({
-        ...feat,
-        elevation: feat.via_ferrata_scale ? `Scale ${feat.via_ferrata_scale}` : null,
-        description: 'Via ferrata route segment.',
-        website: ''
-      });
+    const panelProps = feat.type === 'ferrata'
+      ? {
+          ...feat,
+          elevation: feat.via_ferrata_scale ? `Scale ${feat.via_ferrata_scale}` : null,
+          description: 'Via ferrata route segment.',
+          website: ''
+        }
+      : { ...feat };
+
+    updatePanel(panelProps, coordinates);
+
+    if (!coordinates || hasValidElevationValue(panelProps.elevation)) {
       return;
     }
 
-    updatePanel(feat);
+    await waitForMapSettle(map);
+    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates);
+    if (selectionToken !== latestSearchSelectionToken || derivedElevation === null) {
+      return;
+    }
+
+    updatePanel({ ...panelProps, elevation: derivedElevation }, coordinates);
+
   }
 
   searchBox.addEventListener('input', (e) => {
