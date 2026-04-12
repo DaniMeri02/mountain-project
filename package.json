@@ -8,6 +8,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch server.ts",
+    "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
     "fetch:ferrata": "tsx scripts/fetch-via-ferrata.ts",
     "export:ferrata": "tsx scripts/export-via-ferrata.ts",
@@ -17,6 +18,9 @@
   },
   "dependencies": {
     "@fastify/static": "^9.0.0",
+    "@google/generative-ai": "^0.24.1",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.1",
     "fastify": "^5.8.4",
     "pg": "^8.20.0"
   },

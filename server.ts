@@ -1,7 +1,9 @@
+import 'dotenv/config';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import path from 'path';
 import { Pool } from 'pg';
+import { AgentOrchestrator } from './agent/orchestrator';
 
 const fastify = Fastify({ logger: true });
 
@@ -355,6 +357,74 @@ fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) 
     reply.status(500).send({ error: 'Search query failed' });
   }
 });
+
+// ─── AI Agent ─────────────────────────────────────────────────────────────────
+
+type ResearchBody = {
+  name: string;
+  type: string;
+  elevation?: number | string | null;
+  osm_id?: string | number | null;
+  lat?: number | null;
+  lng?: number | null;
+};
+
+const researchBodySchema = {
+  body: {
+    type: 'object',
+    required: ['name', 'type'],
+    properties: {
+      name: { type: 'string', minLength: 1 },
+      type: { type: 'string', minLength: 1 },
+      elevation: {},
+      osm_id: {},
+      lat: { type: ['number', 'null'] },
+      lng: { type: ['number', 'null'] },
+    },
+  },
+} as const;
+
+// Lazy singleton — created on the first AI request so startup never fails
+// if GEMINI_API_KEY is missing (it will fail gracefully at request time).
+let orchestrator: AgentOrchestrator | null = null;
+
+function getOrchestrator(): AgentOrchestrator {
+  if (!orchestrator) {
+    orchestrator = new AgentOrchestrator(pool);
+  }
+  return orchestrator;
+}
+
+fastify.post<{ Body: ResearchBody }>(
+  '/api/ai/research',
+  { schema: researchBodySchema },
+  async (request, reply) => {
+    const { name, type, elevation, osm_id, lat, lng } = request.body;
+    try {
+      return await getOrchestrator().generate({ name, type, elevation, osm_id, lat, lng });
+    } catch (error) {
+      fastify.log.error(error);
+      reply.status(500).send({ error: 'AI generation failed. Check server logs.' });
+    }
+  }
+);
+
+fastify.post<{ Body: ResearchBody }>(
+  '/api/ai/research/regenerate',
+  { schema: researchBodySchema },
+  async (request, reply) => {
+    const { name, type, elevation, osm_id, lat, lng } = request.body;
+    try {
+      return await getOrchestrator().generate(
+        { name, type, elevation, osm_id, lat, lng },
+        true   // forceRegenerate = true — bypasses cache
+      );
+    } catch (error) {
+      fastify.log.error(error);
+      reply.status(500).send({ error: 'AI regeneration failed. Check server logs.' });
+    }
+  }
+);
 
 // Register the plugin to serve static files from the 'public' folder
 fastify.register(fastifyStatic, {
