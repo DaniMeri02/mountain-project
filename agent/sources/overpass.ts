@@ -42,9 +42,8 @@ export async function fetchOverpassData(input: AgentInput): Promise<SourceResult
     return { sourceName: 'OpenStreetMap', content: '', success: false };
   }
 
-  // POIs (peaks, huts, bivouacs) are nodes; ferrata are ways.
-  const elementType = input.type === 'ferrata' ? 'way' : 'node';
-  const overpassQuery = `[out:json][timeout:10];${elementType}(${osmId});out tags;`;
+  // Try all element types: huts can be nodes (point) or ways (building outline)
+  const overpassQuery = `[out:json][timeout:10];(node(${osmId});way(${osmId});relation(${osmId}););out tags;`;
 
   try {
     const response = await fetch(ENDPOINT, {
@@ -70,7 +69,9 @@ export async function fetchOverpassData(input: AgentInput): Promise<SourceResult
       return { sourceName: 'OpenStreetMap', content: '', success: false };
     }
 
-    return { sourceName: 'OpenStreetMap (tags)', content: formatted, success: true };
+    const osmType = element.type === 'relation' ? 'relation' : element.type === 'way' ? 'way' : 'node';
+    const osmUrl = `https://www.openstreetmap.org/${osmType}/${element.id}`;
+    return { sourceName: 'OpenStreetMap (tags)', content: formatted, success: true, url: osmUrl };
   } catch {
     return { sourceName: 'OpenStreetMap', content: '', success: false };
   }

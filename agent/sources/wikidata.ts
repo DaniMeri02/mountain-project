@@ -30,14 +30,9 @@ function formatRow(row: WikidataRow): string {
   return parts.join('\n');
 }
 
-export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
-  const safe = sparqlEscape(input.name);
-
-  const query = `
-    SELECT DISTINCT ?item ?itemLabel ?description ?elevation ?wikipedia ?website ?inception WHERE {
-      { ?item rdfs:label "${safe}"@it . }
-      UNION
-      { ?item skos:altLabel "${safe}"@it . }
+/** Build a SPARQL SELECT body with optional/wikipedia blocks (reused in both queries) */
+function buildSelectBody(): string {
+  return `
       OPTIONAL { ?item schema:description ?description . FILTER(LANG(?description) = "it") }
       OPTIONAL { ?item wdt:P2044 ?elevation }
       OPTIONAL {
@@ -49,6 +44,19 @@ export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
       OPTIONAL { ?item wdt:P856 ?website }
       OPTIONAL { ?item wdt:P571 ?inception }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en" }
+  `;
+}
+
+export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
+  const safe = sparqlEscape(input.name);
+
+  // Primary: exact Italian label match
+  const query = `
+    SELECT DISTINCT ?item ?itemLabel ?description ?elevation ?wikipedia ?website ?inception WHERE {
+      { ?item rdfs:label "${safe}"@it . }
+      UNION
+      { ?item skos:altLabel "${safe}"@it . }
+      ${buildSelectBody()}
     }
     LIMIT 3
   `;
@@ -75,11 +83,53 @@ export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
       .filter((s) => s.length > 0)
       .join('\n---\n');
 
-    if (!formatted) {
+    if (formatted) {
+      const itemUrl = bindings[0]?.item?.value;
+      return { sourceName: 'Wikidata', content: formatted, success: true, url: itemUrl };
+    }
+
+    // Fallback: coordinate-based search within 1km when lat/lng available
+    if (input.lat == null || input.lng == null) {
       return { sourceName: 'Wikidata', content: '', success: false };
     }
 
-    return { sourceName: 'Wikidata', content: formatted, success: true };
+    const coordQuery = `
+      SELECT DISTINCT ?item ?itemLabel ?description ?elevation ?wikipedia ?website ?inception WHERE {
+        SERVICE wikibase:around {
+          ?item wdt:P625 ?coord .
+          bd:serviceParam wikibase:center "Point(${input.lng} ${input.lat})"^^geo:wktLiteral .
+          bd:serviceParam wikibase:radius "1" .
+        }
+        ${buildSelectBody()}
+      }
+      LIMIT 3
+    `;
+
+    const coordUrl = `${ENDPOINT}?query=${encodeURIComponent(coordQuery)}&format=json`;
+    const coordRes = await fetch(coordUrl, {
+      headers: {
+        Accept: 'application/sparql-results+json',
+        'User-Agent': 'MountainPortal/1.0 (personal project; contact: localhost)',
+      },
+      signal: AbortSignal.timeout(12_000),
+    });
+
+    if (!coordRes.ok) {
+      return { sourceName: 'Wikidata', content: '', success: false };
+    }
+
+    const coordData = (await coordRes.json()) as WikidataSparqlResponse;
+    const coordFormatted = (coordData.results?.bindings ?? [])
+      .map(formatRow)
+      .filter((s) => s.length > 0)
+      .join('\n---\n');
+
+    if (!coordFormatted) {
+      return { sourceName: 'Wikidata', content: '', success: false };
+    }
+
+    const coordItemUrl = coordData.results?.bindings[0]?.item?.value;
+    return { sourceName: 'Wikidata (coordinate)', content: coordFormatted, success: true, url: coordItemUrl };
   } catch {
     return { sourceName: 'Wikidata', content: '', success: false };
   }

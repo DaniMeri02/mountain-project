@@ -52,7 +52,7 @@ export async function fetchYouTubeVideos(input: AgentInput): Promise<SourceResul
       .map((item) => {
         const s = item.snippet;
         const month = s.publishedAt.substring(0, 7);
-        const desc = s.description.substring(0, 200).replace(/\n/g, ' ');
+        const desc = s.description.substring(0, 500).replace(/\n/g, ' ');
         return `• "${s.title}" — ${s.channelTitle} (${month})\n  ${desc}`;
       })
       .join('\n\n');

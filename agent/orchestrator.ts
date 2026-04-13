@@ -1,4 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 import type { Pool } from 'pg';
 import { AiDescriptionCache, buildCacheKey } from './cache';
 import { loadAgentPrompt } from './prompt-loader';
@@ -10,7 +12,35 @@ import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
 import type { AgentInput, AgentResponse, SourceResult } from './types';
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
+
+function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
+  const separator = '═'.repeat(60);
+  const lines: string[] = [
+    separator,
+    `AGENT SOURCES DUMP — ${new Date().toISOString()}`,
+    separator,
+    '',
+    '>>> PROMPT SENT TO GEMINI (exactly as Gemini reads it):',
+    '',
+    userMessage,
+    '',
+    separator,
+    '>>> SOURCE DETAILS (including failed sources):',
+    '',
+  ];
+
+  for (const r of results) {
+    lines.push(`--- ${r.sourceName.toUpperCase()} | success: ${r.success} ---`);
+    if (r.url) lines.push(`URL: ${r.url}`);
+    lines.push(r.content.trim() || '(empty)');
+    lines.push('');
+  }
+
+  lines.push(separator);
+  writeFileSync(DUMP_FILE, lines.join('\n'), 'utf8');
+}
 
 /**
  * Builds the user-turn prompt that Gemini receives.
@@ -95,12 +125,29 @@ export class AgentOrchestrator {
     const systemPrompt = loadAgentPrompt();
     const userMessage = buildUserMessage(input, results);
 
-    const model = this.gemini.getGenerativeModel({
-      model: GEMINI_MODEL,
-      systemInstruction: systemPrompt,
-    });
+    // Dump all raw source data to file for inspection before Gemini processes it
+    writeSourcesDump(userMessage, results);
 
-    const geminiResult = await model.generateContent(userMessage);
+    // Try each model in order; fall back to the next on 503 (transient overload)
+    let geminiResult;
+    let lastError: unknown;
+    for (const modelName of GEMINI_MODELS) {
+      const model = this.gemini.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+      });
+      try {
+        geminiResult = await model.generateContent(userMessage);
+        break;
+      } catch (err: unknown) {
+        lastError = err;
+        const is503 = err instanceof Error && (err as { status?: number }).status === 503;
+        if (!is503) throw err;
+        // 503 on this model — wait briefly then try the next one
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+      }
+    }
+    if (!geminiResult) throw lastError;
     const description = geminiResult.response.text();
 
     // Store in cache (upsert — handles both first-time and forced regeneration)

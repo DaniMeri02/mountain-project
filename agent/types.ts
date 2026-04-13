@@ -17,6 +17,7 @@ export interface SourceResult {
   sourceName: string;
   content: string;
   success: boolean;
+  url?: string;  // URL where the content was found, for the sources dump
 }
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
