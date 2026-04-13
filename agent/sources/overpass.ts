@@ -15,6 +15,7 @@ const USEFUL_TAGS = new Set([
   'operator', 'operator:it', 'owner',
   'access', 'access:description',
   'tourism', 'mountain_pass', 'natural',
+  'ascent', 'descent', 'distance',
   'via_ferrata_scale', 'sac_scale', 'trail_visibility',
   'osmc:symbol', 'network', 'route',
   'addr:street', 'addr:city', 'addr:province',

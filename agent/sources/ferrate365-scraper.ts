@@ -50,8 +50,40 @@ async function findFerrataUrl(name: string): Promise<string | null> {
 }
 
 /**
+ * Scans raw HTML for numeric ferrata stats that may be in any element or JS data.
+ * Returns a compact string like "Dislivello: 534 m | Altitudine max: 1736 m | ..."
+ */
+function extractStatsFromHtml(rawHtml: string): string {
+  // Strip tags and decode HTML entities to get a flat text stream
+  const flat = rawHtml
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  const patterns: Array<[string, RegExp]> = [
+    ['Dislivello', /Dislivello\s*:?\s*(\d[\d\s]*m)/i],
+    ['Altitudine max', /Altitudine\s*max\s*:?\s*(\d+\s*m)/i],
+    ['Lunghezza', /Lunghezza\s*:?\s*(\d[\d.,]*\s*km)/i],
+    ['Avvicinamento', /Avvicinamento\s*:?\s*(\d+[h:'\s]\d*\s*[hm']*)/i],
+    ['Durata ferrata', /(?:^|[^a-z])Ferrata\s*:?\s*(\d+[h:'\s]\d*\s*[hm']*)/i],
+    ['Itinerario', /Itinerario\s*:?\s*(\d+[h:'\s]\d*\s*[hm']*)/i],
+  ];
+
+  const found: string[] = [];
+  for (const [label, pattern] of patterns) {
+    const match = flat.match(pattern);
+    if (match) found.push(`${label}: ${match[1].trim()}`);
+  }
+  return found.join(' | ');
+}
+
+/**
  * Fetches and scrapes a ferrate365.it ferrata detail page.
- * Returns up to 3000 characters of cleaned main content, or null on failure.
+ * Returns key stats (always) + main description text, or null on failure.
  */
 async function scrapeDetailPage(url: string): Promise<string | null> {
   let html: string;
@@ -66,6 +98,10 @@ async function scrapeDetailPage(url: string): Promise<string | null> {
     return null;
   }
 
+  // Extract numeric stats from the raw HTML before Cheerio strips anything.
+  // These values may live in any element or even inside JS/JSON blobs.
+  const stats = extractStatsFromHtml(html);
+
   const $ = load(html);
   $('script, style, nav, header, footer, .menu, aside, .sidebar, .widget, .comments').remove();
 
@@ -73,9 +109,16 @@ async function scrapeDetailPage(url: string): Promise<string | null> {
     'main, article, .content, .entry-content, #content, .ferrata-content'
   ).first();
   const rawText = mainContent.length > 0 ? mainContent.text() : $('body').text();
+  const mainText = rawText.replace(/\s+/g, ' ').trim();
 
-  const cleaned = rawText.replace(/\s+/g, ' ').trim();
-  return cleaned.length > 150 ? cleaned.substring(0, 3_000) : null;
+  // Stats always come first so Gemini sees them even if description is long
+  const parts = [
+    stats.length > 0 ? `Dettagli: ${stats}` : '',
+    mainText.substring(0, 2_800),
+  ].filter(s => s.length > 0);
+
+  const combined = parts.join('\n\n');
+  return combined.length > 150 ? combined : null;
 }
 
 export async function fetchFerrate365Data(input: AgentInput): Promise<SourceResult> {
