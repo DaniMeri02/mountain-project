@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.ferrate365.it)",
+      "WebFetch(domain:lite.duckduckgo.com)"
+    ]
+  },
+  "outputStyle": "Learning"
+}

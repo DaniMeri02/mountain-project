@@ -72,7 +72,10 @@ I campi obbligatori (sempre presenti) sono marcati **OBB**. Gli altri vanno incl
 ## STRUTTURA OUTPUT PER RIFUGI E BIVACCHI
 
 <h3>Panoramica</h3>
-<p>**OBB** Descrizione del rifugio: posizione, gestione (CAI/privato), ambiente circostante.</p>
+<p>Descrizione del rifugio: posizione, gestione (CAI/privato), ambiente circostante.</p>
+
+<h3>Accesso e Difficoltà</h3>
+<p>Scala CAI di riferimento (T, E, EE, EEA), tipo di terreno, tratti esposti o attrezzati, condizioni tipiche.</p>
 
 <h3>Informazioni Pratiche</h3>
 <ul>

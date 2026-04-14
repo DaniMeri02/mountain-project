@@ -1,113 +1,71 @@
 ════════════════════════════════════════════════════════════
-AGENT SOURCES DUMP — 2026-04-13T21:24:23.145Z
+AGENT SOURCES DUMP — 2026-04-14T08:14:14.250Z
 ════════════════════════════════════════════════════════════
 
 >>> PROMPT SENT TO GEMINI (exactly as Gemini reads it):
 
-Nome: Rifugio Alpe Corte
-Tipo: hut
-Altitudine: 1410m s.l.m.
-Coordinate: 45.95780N, 9.82399E
+Nome: Pizzo dei Tre Signori
+Tipo: peak
+Altitudine: 2554m s.l.m.
+Coordinate: 46.01151N, 9.52746E
 
 --- DATI RACCOLTI ---
-=== WIKIDATA (COORDINATE) ===
-Descrizione: torrente della provincia di Bergamo
-Pagina Wikipedia: https://it.wikipedia.org/wiki/Acqualina
----
-Descrizione: rifugio nelle Prealpi Orobie
-Altitudine (Wikidata): 1410m s.l.m.
-Anno di costruzione/inaugurazione: 1948
-Pagina Wikipedia: https://it.wikipedia.org/wiki/Rifugio_Alpe_Corte
-
-=== OPENSTREETMAP (TAGS) ===
-addr › city: Ardesio
-addr › street: Via Alpe Corte
-capacity: 24
-description: Categoria B; 70 posti in sala da pranzo e 24 posti letto; rifugio alla memoria di Elia ed Attilio Tombini, ottobre 1989
-ele: 1410
-email: alpecorte@caibergamo.it
-name: Rifugio Alpe Corte
-opening hours: "Apertura continuata da Maggio ad Ottobre"
-operator: CAI Bergamo - Sez. A. Locatelli
-phone: +39 0346 35090
-tourism: alpine_hut
-website: http://www.caibergamo.it/uo.php?uo=ALPEC
-wikidata: Q3935395
-wikipedia: it:Rifugio Alpe Corte
-
-=== RIFUGI REGIONALI (WWW.RIFUGI.LOMBARDIA.IT) ===
-Mt. 1410 Rifugio Alpe Corte Bassa Richiedi Informazioni Rifugio alpino a 1.410 mt.di quota, nella Valcanale, valle laterale della Valle Seriana, all’altezza di Ardesio (Bg), raggiungibile solo a piedi in meno di 1 ora di cammino. Rinnovato di recente dai volontari del CAI sezione di Bergamo. Rifugio attrezzato anche per i diversamente abili (purtroppo oggi la strada è piuttosto impervia) e per le famiglie con figli piccoli. Meravigliosa vista sul gruppo del Monte Arera e Monte Secco. Cucina tipica bergamasca. Mostra il calendario di apertura del rifugio Calendario di apertura del rifugio GEN G 1 V 2 S 3 D 4 L 5 M 6 M 7 G 8 V 9 S 10 D 11 L 12 M 13 M 14 G 15 V 16 S 17 D 18 L 19 M 20 M 21 G 22 V 23 S 24 D 25 L 26 M 27 M 28 G 29 V 30 S 31 FEB D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 MAR D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 D 29 L 30 M 31 APR M 1 G 2 V 3 S 4 D 5 L 6 M 7 M 8 G 9 V 10 S 11 D 12 L 13 M 14 M 15 G 16 V 17 S 18 D 19 L 20 M 21 M 22 G 23 V 24 S 25 D 26 L 27 M 28 M 29 G 30 MAG V 1 S 2 D 3 L 4 M 5 M 6 G 7 V 8 S 9 D 10 L 11 M 12 M 13 G 14 V 15 S 16 D 17 L 18 M 19 M 20 G 21 V 22 S 23 D 24 L 25 M 26 M 27 G 28 V 29 S 30 D 31 GIU L 1 M 2 M 3 G 4 V 5 S 6 D 7 L 8 M 9 M 10 G 11 V 12 S 13 D 14 L 15 M 16 M 17 G 18 V 19 S 20 D 21 L 22 M 23 M 24 G 25 V 26 S 27 D 28 L 29 M 30 LUG M 1 G 2 V 3 S 4 D 5 L 6 M 7 M 8 G 9 V 10 S 11 D 12 L 13 M 14 M 15 G 16 V 17 S 18 D 19 L 20 M 21 M 22 G 23 V 24 S 25 D 26 L 27 M 28 M 29 G 30 V 31 AGO S 1 D 2 L 3 M 4 M 5 G 6 V 7 S 8 D 9 L 10 M 11 M 12 G 13 V 14 S 15 D 16 L 17 M 18 M 19 G 20 V 21 S 22 D 23 L 24 M 25 M 26 G 27 V 28 S 29 D 30 L 31 SET M 1 M 2 G 3 V 4 S 5 D 6 L 7 M 8 M 9 G 10 V 11 S 12 D 13 L 14 M 15 M 16 G 17 V 18 S 19 D 20 L 21 M 22 M 23 G 24 V 25 S 26 D 27 L 28 M 29 M 30 OTT G 1 V 2 S 3 D 4 L 5 M 6 M 7 G 8 V 9 S 10 D 11 L 12 M 13 M 14 G 15 V 16 S 17 D 18 L 19 M 20 M 21 G 22 V 23 S 24 D 25 L 26 M 27 M 28 G 29 V 30 S 31 NOV D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 D 29 L 30 DIC M 1 M 2 G 3 V 4 S 5 D 6 L 7 M 8 M 9 G 10 V 11 S 12 D 13 L 14 M 15 M 16 G 17 V 18 S 19 D 20 L 21 M 22 M 23 G 24 V 25 S 26 D 27 L 28 M 29 M 30 G 31 Le date di apertura sono indicative. Nei periodi di inizio e fine stagione verifica l'apertura telefonando in rifugio. Galleria fotografica Servizi Posti Letto: 31 Posti Pranzo: 80 Posti Tavola Esterni: 150 Sconti Cai Apertura Su Richiesta Prezzo Mezza Pensione: da 45 €€ a 33 € Solo a Piedi Animali Ammessi Vendita Sacco Lenzuolo Servizi in Camera Acqua Calda Luce Doccia Prodotti Tipici Menù per vegetariani Menù per intolleranti Bancomat Punti di forza accoglienza per famiglie con bambini accoglienza per gruppi e associazioni organizzazione di attività e progetti sociali organizzazione di serate e giornate a tema organizzazione di ev
+=== WIKIDATA ===
+Descrizione: montagna delle Alpi Orobie
+Altitudine (Wikidata): 2554m s.l.m.
+Pagina Wikipedia: https://it.wikipedia.org/wiki/Pizzo_dei_Tre_Signori
 
 === YOUTUBE ===
-• "(R34) Rifugio Alpe Corte (1410m) da Valcanale (BG)" — Aria Aperta - Hiking & Walking (2022-06)
-  STAGIONE 7 DIFFICOLTA': FACILE: la strada agro silvo pastorale che dal parcheggio di Valcanale porta dirtettamente al rifugio ...
+• "PIZZO dei TRE SIGNORI da Ornica, la nostra spedizione più FATICOSA!" — mariusaurus (2022-05)
+  Ciao ragazzi, oggi vi portiamo in cima al Pizzo dei Tre Signori, 2554m sul livello del mare. Ma first things first: avete visto che ...
 
-• "RIFUGIO ALPE CORTE e LAGO BRANCHINO • Sentiero da Valcanale [Via Normale]" — Luca Gherardi - Esplorare la Natura (2020-06)
-  Oggi vi porto con me in Val Seriana e più precisamente a Valcanale dove inizia il sentiero che porta al rifugio Alpe Corte e al ...
+• "Pizzo dei Tre Signori 2554m #Escursione #PizzoTreSignori #drone" — Shanuka Perera (2021-09)
+  Il Pizzo dei Tre Signori situata lungo la cresta principale delle Alpi Orobie, Come il nome ricorda, il pizzo gode storicamente di una ...
 
-• "RIFUGIO ALPE CORTE 🏔️❄️ da Valcanale (BG)" — Trek 4:20 ⛰️🚬 (2026-02)
-  In questo video vi porto con me lungo il sentiero che conduce al Rifugio Alpe Corte, una delle mete più affascinanti della ...
+• "PIZZO dei TRE SIGNORI (2554 metri) da Ornica ⛰️ Discesa con giro ad anello" — Luca Gherardi - Esplorare la Natura (2024-10)
+  SUPPORTA QUESTO PROGETTO: https://www.gofundme.com/f/luca-gherardi-esplorare-la-natura INFORMAZIONI SUL ...
 
-• "Trekking in Valcanale (Valle Seriana Comune di Ardesio) ai rifugi Alpe Corte e Branchino (lago)" — Charles Andrioli (2016-08)
-  Trekking in Alta Val Seriana: partenza da Valcanale verso il rifugio Alpe Corte (1410 mt) per poi proseguire verso il rifugio ...
+• "ANELLO DEI 4 LAGHI AL PIZZO DEI TRE SIGNORI | Val Gerola" — Alberto Lolatto (2025-07)
+  Salita al Pizzo dei Tre Signori (2.554 m) con uno spettacolare giro ad anello, toccando 4 bellissimi laghi alpini, il Lago di Trona, ...
 
-• "Dal rifugio Alpe Corte al passo dei laghi Gemelli (BG)" — Pietro Trek (2021-08)
-  Una bella escursione nelle Orobie che parte dall'Alpe Corte (BG) e arriva fino al passo dei laghi Gemelli (2138mt). Il sentiero si ...
+• "SkiMo - Pizzo dei Tre Signori da Ornica - SciAlpinismo" — Andre Photo (2021-03)
+  Ci allontaniamo un po' dalle nostre zone per andare a (ri)fare una salita stupenda al Pizzo dei Tre Signori, questa volta partendo ...
 
 Genera ora la descrizione completa seguendo le istruzioni.
 
 ════════════════════════════════════════════════════════════
 >>> SOURCE DETAILS (including failed sources):
 
---- WIKIDATA (COORDINATE) | success: true ---
-URL: http://www.wikidata.org/entity/Q3604663
-Descrizione: torrente della provincia di Bergamo
-Pagina Wikipedia: https://it.wikipedia.org/wiki/Acqualina
----
-Descrizione: rifugio nelle Prealpi Orobie
-Altitudine (Wikidata): 1410m s.l.m.
-Anno di costruzione/inaugurazione: 1948
-Pagina Wikipedia: https://it.wikipedia.org/wiki/Rifugio_Alpe_Corte
+--- WIKIDATA | success: true ---
+URL: http://www.wikidata.org/entity/Q2739302
+Descrizione: montagna delle Alpi Orobie
+Altitudine (Wikidata): 2554m s.l.m.
+Pagina Wikipedia: https://it.wikipedia.org/wiki/Pizzo_dei_Tre_Signori
 
---- OPENSTREETMAP (TAGS) | success: true ---
-URL: https://www.openstreetmap.org/way/38221584
-addr › city: Ardesio
-addr › street: Via Alpe Corte
-capacity: 24
-description: Categoria B; 70 posti in sala da pranzo e 24 posti letto; rifugio alla memoria di Elia ed Attilio Tombini, ottobre 1989
-ele: 1410
-email: alpecorte@caibergamo.it
-name: Rifugio Alpe Corte
-opening hours: "Apertura continuata da Maggio ad Ottobre"
-operator: CAI Bergamo - Sez. A. Locatelli
-phone: +39 0346 35090
-tourism: alpine_hut
-website: http://www.caibergamo.it/uo.php?uo=ALPEC
-wikidata: Q3935395
-wikipedia: it:Rifugio Alpe Corte
+--- OPENSTREETMAP | success: false ---
+(empty)
 
---- RIFUGI REGIONALI (WWW.RIFUGI.LOMBARDIA.IT) | success: true ---
-URL: https://www.rifugi.lombardia.it/bergamo/ardesio/rifugio-alpe-corte-bassa.html
-Mt. 1410 Rifugio Alpe Corte Bassa Richiedi Informazioni Rifugio alpino a 1.410 mt.di quota, nella Valcanale, valle laterale della Valle Seriana, all’altezza di Ardesio (Bg), raggiungibile solo a piedi in meno di 1 ora di cammino. Rinnovato di recente dai volontari del CAI sezione di Bergamo. Rifugio attrezzato anche per i diversamente abili (purtroppo oggi la strada è piuttosto impervia) e per le famiglie con figli piccoli. Meravigliosa vista sul gruppo del Monte Arera e Monte Secco. Cucina tipica bergamasca. Mostra il calendario di apertura del rifugio Calendario di apertura del rifugio GEN G 1 V 2 S 3 D 4 L 5 M 6 M 7 G 8 V 9 S 10 D 11 L 12 M 13 M 14 G 15 V 16 S 17 D 18 L 19 M 20 M 21 G 22 V 23 S 24 D 25 L 26 M 27 M 28 G 29 V 30 S 31 FEB D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 MAR D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 D 29 L 30 M 31 APR M 1 G 2 V 3 S 4 D 5 L 6 M 7 M 8 G 9 V 10 S 11 D 12 L 13 M 14 M 15 G 16 V 17 S 18 D 19 L 20 M 21 M 22 G 23 V 24 S 25 D 26 L 27 M 28 M 29 G 30 MAG V 1 S 2 D 3 L 4 M 5 M 6 G 7 V 8 S 9 D 10 L 11 M 12 M 13 G 14 V 15 S 16 D 17 L 18 M 19 M 20 G 21 V 22 S 23 D 24 L 25 M 26 M 27 G 28 V 29 S 30 D 31 GIU L 1 M 2 M 3 G 4 V 5 S 6 D 7 L 8 M 9 M 10 G 11 V 12 S 13 D 14 L 15 M 16 M 17 G 18 V 19 S 20 D 21 L 22 M 23 M 24 G 25 V 26 S 27 D 28 L 29 M 30 LUG M 1 G 2 V 3 S 4 D 5 L 6 M 7 M 8 G 9 V 10 S 11 D 12 L 13 M 14 M 15 G 16 V 17 S 18 D 19 L 20 M 21 M 22 G 23 V 24 S 25 D 26 L 27 M 28 M 29 G 30 V 31 AGO S 1 D 2 L 3 M 4 M 5 G 6 V 7 S 8 D 9 L 10 M 11 M 12 G 13 V 14 S 15 D 16 L 17 M 18 M 19 G 20 V 21 S 22 D 23 L 24 M 25 M 26 G 27 V 28 S 29 D 30 L 31 SET M 1 M 2 G 3 V 4 S 5 D 6 L 7 M 8 M 9 G 10 V 11 S 12 D 13 L 14 M 15 M 16 G 17 V 18 S 19 D 20 L 21 M 22 M 23 G 24 V 25 S 26 D 27 L 28 M 29 M 30 OTT G 1 V 2 S 3 D 4 L 5 M 6 M 7 G 8 V 9 S 10 D 11 L 12 M 13 M 14 G 15 V 16 S 17 D 18 L 19 M 20 M 21 G 22 V 23 S 24 D 25 L 26 M 27 M 28 G 29 V 30 S 31 NOV D 1 L 2 M 3 M 4 G 5 V 6 S 7 D 8 L 9 M 10 M 11 G 12 V 13 S 14 D 15 L 16 M 17 M 18 G 19 V 20 S 21 D 22 L 23 M 24 M 25 G 26 V 27 S 28 D 29 L 30 DIC M 1 M 2 G 3 V 4 S 5 D 6 L 7 M 8 M 9 G 10 V 11 S 12 D 13 L 14 M 15 M 16 G 17 V 18 S 19 D 20 L 21 M 22 M 23 G 24 V 25 S 26 D 27 L 28 M 29 M 30 G 31 Le date di apertura sono indicative. Nei periodi di inizio e fine stagione verifica l'apertura telefonando in rifugio. Galleria fotografica Servizi Posti Letto: 31 Posti Pranzo: 80 Posti Tavola Esterni: 150 Sconti Cai Apertura Su Richiesta Prezzo Mezza Pensione: da 45 €€ a 33 € Solo a Piedi Animali Ammessi Vendita Sacco Lenzuolo Servizi in Camera Acqua Calda Luce Doccia Prodotti Tipici Menù per vegetariani Menù per intolleranti Bancomat Punti di forza accoglienza per famiglie con bambini accoglienza per gruppi e associazioni organizzazione di attività e progetti sociali organizzazione di serate e giornate a tema organizzazione di ev
+--- RIFUGI REGIONALI | success: false ---
+(empty)
 
 --- FERRATE365 | success: false ---
 (empty)
 
 --- YOUTUBE | success: true ---
-• "(R34) Rifugio Alpe Corte (1410m) da Valcanale (BG)" — Aria Aperta - Hiking & Walking (2022-06)
-  STAGIONE 7 DIFFICOLTA': FACILE: la strada agro silvo pastorale che dal parcheggio di Valcanale porta dirtettamente al rifugio ...
+• "PIZZO dei TRE SIGNORI da Ornica, la nostra spedizione più FATICOSA!" — mariusaurus (2022-05)
+  Ciao ragazzi, oggi vi portiamo in cima al Pizzo dei Tre Signori, 2554m sul livello del mare. Ma first things first: avete visto che ...
 
-• "RIFUGIO ALPE CORTE e LAGO BRANCHINO • Sentiero da Valcanale [Via Normale]" — Luca Gherardi - Esplorare la Natura (2020-06)
-  Oggi vi porto con me in Val Seriana e più precisamente a Valcanale dove inizia il sentiero che porta al rifugio Alpe Corte e al ...
+• "Pizzo dei Tre Signori 2554m #Escursione #PizzoTreSignori #drone" — Shanuka Perera (2021-09)
+  Il Pizzo dei Tre Signori situata lungo la cresta principale delle Alpi Orobie, Come il nome ricorda, il pizzo gode storicamente di una ...
 
-• "RIFUGIO ALPE CORTE 🏔️❄️ da Valcanale (BG)" — Trek 4:20 ⛰️🚬 (2026-02)
-  In questo video vi porto con me lungo il sentiero che conduce al Rifugio Alpe Corte, una delle mete più affascinanti della ...
+• "PIZZO dei TRE SIGNORI (2554 metri) da Ornica ⛰️ Discesa con giro ad anello" — Luca Gherardi - Esplorare la Natura (2024-10)
+  SUPPORTA QUESTO PROGETTO: https://www.gofundme.com/f/luca-gherardi-esplorare-la-natura INFORMAZIONI SUL ...
 
-• "Trekking in Valcanale (Valle Seriana Comune di Ardesio) ai rifugi Alpe Corte e Branchino (lago)" — Charles Andrioli (2016-08)
-  Trekking in Alta Val Seriana: partenza da Valcanale verso il rifugio Alpe Corte (1410 mt) per poi proseguire verso il rifugio ...
+• "ANELLO DEI 4 LAGHI AL PIZZO DEI TRE SIGNORI | Val Gerola" — Alberto Lolatto (2025-07)
+  Salita al Pizzo dei Tre Signori (2.554 m) con uno spettacolare giro ad anello, toccando 4 bellissimi laghi alpini, il Lago di Trona, ...
 
-• "Dal rifugio Alpe Corte al passo dei laghi Gemelli (BG)" — Pietro Trek (2021-08)
-  Una bella escursione nelle Orobie che parte dall'Alpe Corte (BG) e arriva fino al passo dei laghi Gemelli (2138mt). Il sentiero si ...
+• "SkiMo - Pizzo dei Tre Signori da Ornica - SciAlpinismo" — Andre Photo (2021-03)
+  Ci allontaniamo un po' dalle nostre zone per andare a (ri)fare una salita stupenda al Pizzo dei Tre Signori, questa volta partendo ...
 
 --- REDDIT | success: false ---
 (empty)
