@@ -118,7 +118,7 @@ export async function fetchFacebookPosts(input: AgentInput): Promise<SourceResul
     tasks.push(
       runApifyActor<ApifyFacebookPost>(
         PAGES_ACTOR,
-        { startUrls: page_ids.map((id) => ({ url: `https://www.facebook.com/${id}` })), resultsLimit: 25 },
+        { startUrls: page_ids.map((id) => ({ url: `https://www.facebook.com/${id}` })), resultsLimit: 10 },
         token
       ).catch(() => [])
     );
@@ -128,7 +128,7 @@ export async function fetchFacebookPosts(input: AgentInput): Promise<SourceResul
     tasks.push(
       runApifyActor<ApifyFacebookPost>(
         GROUPS_ACTOR,
-        { groupUrls: group_ids.map((id) => `https://www.facebook.com/groups/${id}`), postsLimit: 25 },
+        { startUrls: group_ids.map((id) => ({ url: `https://www.facebook.com/groups/${id}` })), resultsLimit: 10 },
         token
       ).catch(() => [])
     );

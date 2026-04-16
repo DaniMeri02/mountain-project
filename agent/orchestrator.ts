@@ -11,8 +11,9 @@ import { fetchFerrate365Data } from './sources/ferrate365-scraper';
 import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
 import { fetchFacebookPosts } from './sources/facebook';
-import { fetchTripAdvisorData } from './sources/tripadvisor';
-import { fetchKomootRoutes } from './sources/komoot';
+// TripAdvisor (maxcopell~tripadvisor) charges per-run on top of compute units — disabled
+// Komoot (logiover~komoot-hiking-outdoor-routes-scraper) requires a paid plan (HTTP 402) — disabled
+// Facebook (apify~facebook-posts/groups-scraper) — disabled: Apify credits exhausted
 import type { AgentInput, AgentResponse, SourceResult } from './types';
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
@@ -112,9 +113,7 @@ export class AgentOrchestrator {
       fetchFerrate365Data(input),
       fetchYouTubeVideos(input),
       fetchRedditPosts(input),
-      fetchFacebookPosts(input),
-      fetchTripAdvisorData(input),
-      fetchKomootRoutes(input),
+      // fetchFacebookPosts(input),  // disabled: Apify credits exhausted
     ]);
 
     const results: SourceResult[] = settled.map((outcome) =>
