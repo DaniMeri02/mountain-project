@@ -10,6 +10,9 @@ import { fetchRifugiData } from './sources/rifugi-scraper';
 import { fetchFerrate365Data } from './sources/ferrate365-scraper';
 import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
+import { fetchFacebookPosts } from './sources/facebook';
+import { fetchTripAdvisorData } from './sources/tripadvisor';
+import { fetchKomootRoutes } from './sources/komoot';
 import type { AgentInput, AgentResponse, SourceResult } from './types';
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
@@ -109,6 +112,9 @@ export class AgentOrchestrator {
       fetchFerrate365Data(input),
       fetchYouTubeVideos(input),
       fetchRedditPosts(input),
+      fetchFacebookPosts(input),
+      fetchTripAdvisorData(input),
+      fetchKomootRoutes(input),
     ]);
 
     const results: SourceResult[] = settled.map((outcome) =>

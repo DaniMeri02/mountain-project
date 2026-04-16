@@ -100,6 +100,52 @@ export interface YouTubeSearchResponse {
   error?: { message: string; code: number };
 }
 
+// ─── Facebook via Apify ───────────────────────────────────────────────────────
+
+/** Single post returned by the Apify facebook-posts-scraper actor. */
+export interface ApifyFacebookPost {
+  postId?: string;
+  pageName?: string;
+  url?: string;
+  time?: string;         // ISO date string e.g. "2026-04-16T10:52:19.000Z"
+  text?: string;
+  user?: { id: string; name: string };
+  inputUrl?: string;
+}
+
+/** Shape of ai-agent-conf/facebook-sources.json */
+export interface FacebookSourcesConfig {
+  page_ids: string[];    // Facebook page usernames (the part after facebook.com/)
+  group_ids: string[];   // Public group IDs/names (the part after facebook.com/groups/)
+}
+
+// ─── TripAdvisor via Apify ────────────────────────────────────────────────────
+
+/** Single place returned by the maxcopell/tripadvisor Apify actor. */
+export interface TripAdvisorPlace {
+  name?: string;
+  locationString?: string;     // e.g. "Bergamo, Province of Bergamo, Italy"
+  description?: string;
+  rating?: number;             // 0–5
+  numberOfReviews?: number;
+  url?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+// ─── Komoot via Apify ─────────────────────────────────────────────────────────
+
+/** Single route returned by the logiover/komoot-hiking-outdoor-routes-scraper actor. */
+export interface KomootRoute {
+  name?: string;
+  description?: string;        // may contain HTML tags
+  distance?: number;           // metres
+  elevation_up?: number;       // metres of ascent
+  difficulty?: string;         // e.g. "easy", "moderate", "difficult"
+  sport?: string;              // e.g. "hike", "climbing"
+  url?: string;
+}
+
 // ─── Reddit API ───────────────────────────────────────────────────────────────
 
 export interface RedditTokenResponse {
