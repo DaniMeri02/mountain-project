@@ -47,6 +47,46 @@ async function fetchTours(highlightId: number): Promise<KomootTour[]> {
   return data._embedded?.items ?? [];
 }
 
+/**
+ * Returns the richest description available for a tour:
+ * - User-authored tours: the list endpoint already carries the full text (~1000-2000 chars)
+ * - Editorial tours: the list only has a short blurb — fetch the detail endpoint and extract
+ *   the 2 most informative FAQs (terrain/landmarks/wildlife).
+ */
+async function fetchTourFullDescription(tourId: string, listText: string): Promise<string> {
+  // Long list text = user-authored tour — already complete, just cap it
+  if (listText.length > 300) return listText.replace(/\s+/g, ' ').trim().slice(0, 700);
+
+  // Short text = editorial tour — the FAQ array on the detail endpoint has the real content
+  const numericId = tourId.replace(/^e/, '');
+  try {
+    const res = await fetch(`${BASE}/tours/${numericId}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return listText;
+
+    const data = (await res.json()) as {
+      faq?: Array<{ question: string; answer: string }>;
+    };
+    if (!data.faq?.length) return listText;
+
+    // Prefer FAQs about what to experience on the trail — most useful for a guide
+    const USEFUL = /terrain|expect|highlight|viewpoint|landmark|wildlife|flora|scenery|feature/i;
+    const chosen = [
+      ...data.faq.filter((f) => USEFUL.test(f.question)),
+      ...data.faq,
+    ]
+      .filter((f, i, arr) => arr.indexOf(f) === i) // deduplicate preserving order
+      .slice(0, 2);
+
+    return chosen
+      .map((f) => f.answer.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 450))
+      .join('\n');
+  } catch {
+    return listText;
+  }
+}
+
 async function fetchTips(highlightId: number): Promise<KomootTip[]> {
   const url = `${BASE}/highlights/${highlightId}/tips/?limit=10`;
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
@@ -80,18 +120,26 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
     if (intro) lines.push(`Komoot intro: ${intro}`);
   }
 
-  // Top 3 tours sorted by editorial rank (API returns them ranked)
+  // Top 2 tours — fetch full descriptions in parallel (editorial tours via FAQ, user tours via list text)
   const tours = toursResult.status === 'fulfilled' ? toursResult.value : [];
-  for (const t of tours.slice(0, 3)) {
+  const top2 = tours.slice(0, 2);
+  const descResults = await Promise.allSettled(
+    top2.map((t) =>
+      fetchTourFullDescription(
+        String(t.id ?? ''),
+        t._embedded?.tour_description?.text ?? '',
+      ),
+    ),
+  );
+
+  for (let i = 0; i < top2.length; i++) {
+    const t = top2[i];
     const parts: string[] = [];
     if (t.name) parts.push(t.name);
     if (t.distance != null) parts.push(`${(t.distance / 1_000).toFixed(1)} km`);
     if (t.elevation_up != null) parts.push(`↑${Math.round(t.elevation_up)} m`);
     if (t.difficulty?.grade) parts.push(t.difficulty.grade);
-    const desc =
-      t._embedded?.tour_description?.short_description ??
-      t._embedded?.tour_description?.text?.slice(0, 150) ??
-      '';
+    const desc = descResults[i].status === 'fulfilled' ? descResults[i].value : '';
     lines.push(`Tour: ${parts.join(' · ')}${desc ? `\n  ${desc}` : ''}`);
   }
 
