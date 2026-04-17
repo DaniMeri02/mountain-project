@@ -130,8 +130,39 @@ function findBestMatch(
 }
 
 /**
+ * Extracts the sidebar boxes (contacts, location info, access routes) from a
+ * rifugi.lombardia.it detail page before the sidebar is stripped from the DOM.
+ */
+function extractSideboxes($: ReturnType<typeof load>): string {
+  const parts: string[] = [];
+
+  $('.sidebox').each((_, box) => {
+    const title = cleanText($('.boxtitle', box).text());
+    const content = $('.boxcontent', box);
+
+    if (title === 'Contatti del rifugio' || title === 'Informazioni utili') {
+      // Remove social/print-only links before reading text
+      $('.hidden-print, a[href*="facebook"], a[href*="instagram"]', content).remove();
+      const text = cleanText(content.text());
+      if (text) parts.push(text);
+    } else if (title === 'Accesso al rifugio') {
+      $('.approach-data', content).each((_, ap) => {
+        const text = cleanText($(ap).text());
+        // Skip entries with no time or 00:00 — incomplete/invalid routes
+        if (text && text.includes('Tempo:') && !text.includes('00:00')) {
+          parts.push(`Accesso — ${text}`);
+        }
+      });
+    }
+  });
+
+  return parts.join('\n');
+}
+
+/**
  * Fetches and scrapes a rifugi.lombardia.it detail page.
- * Returns up to 3000 characters of cleaned main content, or null on failure.
+ * Returns structured sidebar info (contacts, location, access) combined with
+ * the main descriptive text, or null on failure.
  */
 async function scrapeDetailPage(url: string): Promise<string | null> {
   let html: string;
@@ -147,15 +178,24 @@ async function scrapeDetailPage(url: string): Promise<string | null> {
   }
 
   const $ = load(html);
+
+  // Extract sidebar data BEFORE removing it from the DOM
+  const sideboxText = extractSideboxes($);
+
   $('script, style, nav, header, footer, .menu, .navigation, aside, .sidebar, .widget').remove();
 
   const mainContent = $(
     'main, article, .content, .entry-content, #content, .page-content, .single-content'
   ).first();
   const rawText = mainContent.length > 0 ? mainContent.text() : $('body').text();
+  const mainText = cleanText(rawText);
 
-  const cleaned = cleanText(rawText);
-  return cleaned.length > 150 ? cleaned.substring(0, 3_000) : null;
+  const parts: string[] = [];
+  if (sideboxText) parts.push(sideboxText);
+  if (mainText.length > 150) parts.push(mainText.substring(0, 2_000));
+
+  const combined = parts.join('\n\n');
+  return combined.length > 50 ? combined : null;
 }
 
 export async function fetchRifugiData(input: AgentInput): Promise<SourceResult> {
