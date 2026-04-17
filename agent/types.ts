@@ -92,12 +92,22 @@ export interface YouTubeSnippet {
 }
 
 export interface YouTubeSearchItem {
+  id?: { videoId?: string };
   snippet: YouTubeSnippet;
 }
 
 export interface YouTubeSearchResponse {
   items?: YouTubeSearchItem[];
   error?: { message: string; code: number };
+}
+
+export interface YouTubeVideoItem {
+  id: string;
+  snippet: YouTubeSnippet;
+}
+
+export interface YouTubeVideoResponse {
+  items?: YouTubeVideoItem[];
 }
 
 // ─── Facebook via Apify ───────────────────────────────────────────────────────
