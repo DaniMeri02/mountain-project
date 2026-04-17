@@ -11,8 +11,8 @@ import { fetchFerrate365Data } from './sources/ferrate365-scraper';
 import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
 import { fetchFacebookPosts } from './sources/facebook';
+import { fetchKomootData } from './sources/komoot';
 // TripAdvisor (maxcopell~tripadvisor) charges per-run on top of compute units — disabled
-// Komoot (logiover~komoot-hiking-outdoor-routes-scraper) requires a paid plan (HTTP 402) — disabled
 // Facebook (apify~facebook-posts/groups-scraper) — disabled: Apify credits exhausted
 import type { AgentInput, AgentResponse, SourceResult } from './types';
 
@@ -113,6 +113,7 @@ export class AgentOrchestrator {
       fetchFerrate365Data(input),
       fetchYouTubeVideos(input),
       fetchRedditPosts(input),
+      fetchKomootData(input),
       // fetchFacebookPosts(input),  // disabled: Apify credits exhausted
     ]);
 

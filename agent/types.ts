@@ -133,17 +133,52 @@ export interface TripAdvisorPlace {
   longitude?: number;
 }
 
-// ─── Komoot via Apify ─────────────────────────────────────────────────────────
+// ─── Komoot native API (api.komoot.de/v007) ──────────────────────────────────
+// No authentication required for public highlight, tour and tip data.
 
-/** Single route returned by the logiover/komoot-hiking-outdoor-routes-scraper actor. */
-export interface KomootRoute {
+/** A highlight returned by GET /highlights/?center=lat,lng&max_distance=N */
+export interface KomootHighlight {
+  id: number;
+  base_name?: string;          // original name, e.g. "Rifugio Capanna 2000"
+  name?: string;               // localized display name, e.g. "Capanna 2000 Hut"
+  category?: string;           // primary category: "hut" | "mountain" | "viewpoint" | ...
+  categories?: string[];
+  sport?: string;
+  start_point?: { lat: number; lng: number; alt: number };
+  score?: number;
+  intro?: string;              // HTML description paragraph
+  _links?: {
+    discover_tours?: { href: string };
+    tips?: { href: string };
+  };
+}
+
+/** A tour returned by GET /discover_tours/for_highlight/{id}/ */
+export interface KomootTour {
+  id?: string;
   name?: string;
-  description?: string;        // may contain HTML tags
+  sport?: string;
   distance?: number;           // metres
   elevation_up?: number;       // metres of ascent
-  difficulty?: string;         // e.g. "easy", "moderate", "difficult"
-  sport?: string;              // e.g. "hike", "climbing"
-  url?: string;
+  difficulty?: {
+    grade?: string;            // "easy" | "moderate" | "difficult" | "expert"
+    explanation_technical?: string;
+    explanation_fitness?: string;
+  };
+  duration?: number;           // seconds
+  _embedded?: {
+    tour_description?: {
+      text?: string;
+      short_description?: string;
+    };
+  };
+}
+
+/** A user tip returned by GET /highlights/{id}/tips/ */
+export interface KomootTip {
+  text?: string;
+  sport?: string;
+  votes?: { up?: number; down?: number };
 }
 
 // ─── Reddit API ───────────────────────────────────────────────────────────────
