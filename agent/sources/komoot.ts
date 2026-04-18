@@ -57,20 +57,20 @@ async function findNearbyHighlight(
  * Fallback for highlights with no tagged tours (e.g. bare peaks).
  * Searches nearby highlights within 5 km, prioritising those whose
  * name shares significant words with the input POI name, and returns
- * the first batch of tours found.
+ * the first batch of tours found alongside the highlight they came from.
  */
 async function fetchNearbyFallbackTours(
   inputName: string,
   lat: number,
   lng: number,
   excludeId: number,
-): Promise<KomootTour[]> {
+): Promise<{ tours: KomootTour[]; sourceHighlight: KomootHighlight | null }> {
   try {
     const res = await fetch(
       `${BASE}/highlights/?center=${lat},${lng}&max_distance=5000&limit=20`,
       { signal: AbortSignal.timeout(15_000) },
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { tours: [], sourceHighlight: null };
     const data = (await res.json()) as { _embedded?: { items?: KomootHighlight[] } };
     const nearby = (data._embedded?.items ?? []).filter((h) => h.id !== excludeId);
 
@@ -85,11 +85,11 @@ async function fetchNearbyFallbackTours(
 
     for (const h of ordered.slice(0, 6)) {
       const tours = await fetchTours(h.id);
-      if (tours.length > 0) return tours;
+      if (tours.length > 0) return { tours, sourceHighlight: h };
     }
-    return [];
+    return { tours: [], sourceHighlight: null };
   } catch {
-    return [];
+    return { tours: [], sourceHighlight: null };
   }
 }
 
@@ -145,9 +145,10 @@ async function fetchTips(highlightId: number): Promise<KomootTip[]> {
   const url = `${BASE}/highlights/${highlightId}/tips/?limit=10`;
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) return [];
-  const data = (await res.json()) as { _embedded?: { tips?: KomootTip[] } };
-  return (data._embedded?.tips ?? []).sort(
-    (a, b) => (b.votes?.up ?? 0) - (a.votes?.up ?? 0),
+  // Tips endpoint uses _embedded.items (not _embedded.tips) and rating (not votes)
+  const data = (await res.json()) as { _embedded?: { items?: KomootTip[] } };
+  return (data._embedded?.items ?? []).sort(
+    (a, b) => (b.rating?.up ?? 0) - (a.rating?.up ?? 0),
   );
 }
 
@@ -178,8 +179,11 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
 
   // Top 2 tours — if the matched highlight has none (e.g. a bare peak), fall back to nearby highlights
   let tours = toursResult.status === 'fulfilled' ? toursResult.value : [];
+  let fallbackHighlight: KomootHighlight | null = null;
   if (tours.length === 0) {
-    tours = await fetchNearbyFallbackTours(input.name, input.lat, input.lng, highlight.id);
+    const fallback = await fetchNearbyFallbackTours(input.name, input.lat, input.lng, highlight.id);
+    tours = fallback.tours;
+    fallbackHighlight = fallback.sourceHighlight;
   }
   const top2 = tours.slice(0, 2);
   const descResults = await Promise.allSettled(
@@ -190,6 +194,12 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
       ),
     ),
   );
+
+  // When tours come from a nearby fallback highlight, label the section clearly
+  const tourLabel = fallbackHighlight
+    ? `Nearby approach routes (via ${fallbackHighlight.base_name ?? fallbackHighlight.name})`
+    : null;
+  if (tourLabel) lines.push(tourLabel);
 
   for (let i = 0; i < top2.length; i++) {
     const t = top2[i];
@@ -203,12 +213,12 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
     lines.push(`Tour: ${parts.join(' · ')}${desc ? `\n  ${desc}` : ''}`);
   }
 
-  // Top 3 tips by upvotes (already sorted)
+  // Top 3 tips by upvotes (already sorted) — prefer English translation when available
   const tips = tipsResult.status === 'fulfilled' ? tipsResult.value : [];
   for (const tip of tips.slice(0, 3)) {
-    const text = tip.text?.trim();
+    const text = (tip.translated_text ?? tip.text)?.trim();
     if (text) {
-      const votes = tip.votes?.up ? ` (${tip.votes.up} ↑)` : '';
+      const votes = tip.rating?.up ? ` (${tip.rating.up} ↑)` : '';
       lines.push(`Tip${votes}: ${text.slice(0, 200)}`);
     }
   }

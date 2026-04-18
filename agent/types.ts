@@ -184,11 +184,12 @@ export interface KomootTour {
   };
 }
 
-/** A user tip returned by GET /highlights/{id}/tips/ */
+/** A user tip returned by GET /highlights/{id}/tips/ — _embedded.items[] */
 export interface KomootTip {
-  text?: string;
+  text?: string;            // original text (may be any language)
+  translated_text?: string; // English translation provided by Komoot/Google
   sport?: string;
-  votes?: { up?: number; down?: number };
+  rating?: { up?: number; down?: number }; // API uses "rating", not "votes"
 }
 
 // ─── Reddit API ───────────────────────────────────────────────────────────────
