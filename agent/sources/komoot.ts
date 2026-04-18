@@ -9,15 +9,28 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// Generic Italian/English mountain words that appear in many names — exclude from word-overlap matching
+// so "monte" or "rifugio" alone don't produce false-positive matches across different POIs.
+const GENERIC_WORDS = new Set([
+  'rifugio', 'bivacco', 'bivouac', 'monte', 'colle', 'passo', 'pizzo', 'cima',
+  'bocchetta', 'forcella', 'sentiero', 'alpe', 'valle',
+  'hut', 'lake', 'pass', 'trail', 'mountain', 'peak', 'summit', 'valley',
+  'reservoir', 'viewpoint', 'waterfall', 'junction',
+]);
+
 async function findNearbyHighlight(
   name: string,
   lat: number,
   lng: number,
 ): Promise<KomootHighlight | null> {
   const needle = normalize(name);
+  // Unique words from the needle (5+ chars, not generic) used for word-overlap matching.
+  // Handles translated names: "Rifugio Barbellino" → unique word "barbellino"
+  // matches "Ludwigsburg Hut at Barbellino" even though full strings don't include each other.
+  const needleWords = needle.split(' ').filter((w) => w.length >= 5 && !GENERIC_WORDS.has(w));
 
   for (const radius of SEARCH_RADII) {
-    const url = `${BASE}/highlights/?center=${lat},${lng}&max_distance=${radius}&limit=10`;
+    const url = `${BASE}/highlights/?center=${lat},${lng}&max_distance=${radius}&limit=15`;
     let res: Response;
     try {
       res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
@@ -31,12 +44,53 @@ async function findNearbyHighlight(
 
     const match = highlights.find((h) => {
       const haystack = normalize(h.base_name ?? h.name ?? '');
-      return haystack.includes(needle) || needle.includes(haystack);
+      if (haystack.includes(needle) || needle.includes(haystack)) return true;
+      return needleWords.length > 0 && needleWords.some((w) => haystack.includes(w));
     });
 
     if (match) return match;
   }
   return null;
+}
+
+/**
+ * Fallback for highlights with no tagged tours (e.g. bare peaks).
+ * Searches nearby highlights within 5 km, prioritising those whose
+ * name shares significant words with the input POI name, and returns
+ * the first batch of tours found.
+ */
+async function fetchNearbyFallbackTours(
+  inputName: string,
+  lat: number,
+  lng: number,
+  excludeId: number,
+): Promise<KomootTour[]> {
+  try {
+    const res = await fetch(
+      `${BASE}/highlights/?center=${lat},${lng}&max_distance=5000&limit=20`,
+      { signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { _embedded?: { items?: KomootHighlight[] } };
+    const nearby = (data._embedded?.items ?? []).filter((h) => h.id !== excludeId);
+
+    // Prefer highlights that share at least one significant word with our POI name
+    const words = normalize(inputName).split(' ').filter((w) => w.length >= 4);
+    const nameMatched = nearby.filter((h) =>
+      words.some((w) => normalize(h.base_name ?? h.name ?? '').includes(w)),
+    );
+    const ordered = [...nameMatched, ...nearby].filter(
+      (h, i, arr) => arr.indexOf(h) === i,
+    );
+
+    for (const h of ordered.slice(0, 6)) {
+      const tours = await fetchTours(h.id);
+      if (tours.length > 0) return tours;
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 async function fetchTours(highlightId: number): Promise<KomootTour[]> {
@@ -55,7 +109,7 @@ async function fetchTours(highlightId: number): Promise<KomootTour[]> {
  */
 async function fetchTourFullDescription(tourId: string, listText: string): Promise<string> {
   // Long list text = user-authored tour — already complete, just cap it
-  if (listText.length > 300) return listText.replace(/\s+/g, ' ').trim().slice(0, 700);
+  if (listText.length > 300) return listText.replace(/\s+/g, ' ').trim().slice(0, 1_200);
 
   // Short text = editorial tour — the FAQ array on the detail endpoint has the real content
   const numericId = tourId.replace(/^e/, '');
@@ -80,7 +134,7 @@ async function fetchTourFullDescription(tourId: string, listText: string): Promi
       .slice(0, 2);
 
     return chosen
-      .map((f) => f.answer.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 450))
+      .map((f) => f.answer.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 600))
       .join('\n');
   } catch {
     return listText;
@@ -114,14 +168,19 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
 
   const lines: string[] = [];
 
-  // Highlight intro — strip HTML tags left by Komoot's rich-text editor
+  // Highlight intro — huts carry rich editorial text here (up to 3000+ chars from the list endpoint).
+  // Bare peaks have no intro: Komoot shows Wikipedia text on their site via wiki_poi_id,
+  // but that is fetched by their frontend directly — it is not exposed in the API.
   if (highlight.intro) {
-    const intro = highlight.intro.replace(/<[^>]+>/g, '').trim().slice(0, 400);
-    if (intro) lines.push(`Komoot intro: ${intro}`);
+    const intro = highlight.intro.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 800);
+    if (intro) lines.push(`Komoot: ${intro}`);
   }
 
-  // Top 2 tours — fetch full descriptions in parallel (editorial tours via FAQ, user tours via list text)
-  const tours = toursResult.status === 'fulfilled' ? toursResult.value : [];
+  // Top 2 tours — if the matched highlight has none (e.g. a bare peak), fall back to nearby highlights
+  let tours = toursResult.status === 'fulfilled' ? toursResult.value : [];
+  if (tours.length === 0) {
+    tours = await fetchNearbyFallbackTours(input.name, input.lat, input.lng, highlight.id);
+  }
   const top2 = tours.slice(0, 2);
   const descResults = await Promise.allSettled(
     top2.map((t) =>
@@ -139,7 +198,8 @@ export async function fetchKomootData(input: AgentInput): Promise<SourceResult> 
     if (t.distance != null) parts.push(`${(t.distance / 1_000).toFixed(1)} km`);
     if (t.elevation_up != null) parts.push(`↑${Math.round(t.elevation_up)} m`);
     if (t.difficulty?.grade) parts.push(t.difficulty.grade);
-    const desc = descResults[i].status === 'fulfilled' ? descResults[i].value : '';
+    const descResult = descResults[i];
+    const desc = descResult.status === 'fulfilled' ? descResult.value : '';
     lines.push(`Tour: ${parts.join(' · ')}${desc ? `\n  ${desc}` : ''}`);
   }
 

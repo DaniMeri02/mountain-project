@@ -156,7 +156,7 @@ export interface KomootHighlight {
   sport?: string;
   start_point?: { lat: number; lng: number; alt: number };
   score?: number;
-  intro?: string;              // HTML description paragraph
+  intro?: string;              // HTML description paragraph (present for huts, absent for bare peaks)
   _links?: {
     discover_tours?: { href: string };
     tips?: { href: string };
