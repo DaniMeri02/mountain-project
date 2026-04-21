@@ -9,7 +9,7 @@ A local web portal for exploring mountain huts, bivouacs, peaks, and via ferrata
 - **Backend**: Node.js + Fastify v5 + TypeScript (tsx for dev, esbuild for build)
 - **Database**: PostgreSQL (port 5433, db: `mountain_db`, user: `mountain_worker`) + PostGIS
 - **Frontend**: Vanilla JS (ES modules) + Mapbox GL JS v3
-- **AI Agent**: Google Gemini (`gemini-1.5-flash`) via `@google/generative-ai`
+- **AI Agent**: Groq / OpenRouter (OpenAI-compatible API) — model list in `agent/orchestrator.ts`
 
 ## Running the project
 
@@ -45,7 +45,7 @@ agent/
   types.ts              ← all TypeScript interfaces (no 'any')
   cache.ts              ← AiDescriptionCache class (get/set/invalidate)
   prompt-loader.ts      ← reads ai-agent-conf/agent-prompt.md (memory-cached per process)
-  orchestrator.ts       ← main flow: parallel sources → Gemini → cache → response
+  orchestrator.ts       ← main flow: parallel sources → AI model (Groq/OpenRouter) → cache → response
   sources/
     wikidata.ts         ← Wikidata SPARQL (elevation, Wikipedia, description)
     overpass.ts         ← OSM extra tags via Overpass API (phone, hours, operator…)
@@ -55,14 +55,15 @@ agent/
     reddit.ts           ← Reddit OAuth2 client credentials (skipped if keys missing)
 ```
 
-**Flow**: `POST /api/ai/research` → check cache → if miss: run all 6 sources in parallel via `Promise.allSettled` → build context → call Gemini with system prompt from `agent-prompt.md` → store in DB cache → return `AgentResponse`.
+**Flow**: `POST /api/ai/research` → check cache → if miss: run all sources in parallel via `Promise.allSettled` → build context → call AI model (Groq/OpenRouter) with system prompt from `agent-prompt.md` → store in DB cache → return `AgentResponse`.
 
 Each source fails gracefully (returns `success: false`) without breaking the others.
 
 ## Environment variables (.env)
 
 ```
-GEMINI_API_KEY=        # required — Google AI Studio
+GROQ_API_KEY=          # required — free at console.groq.com → API Keys
+OPENROUTER_API_KEY=    # optional — free at openrouter.ai/keys (OpenRouter fallback)
 YOUTUBE_API_KEY=       # optional — YouTube Data API v3
 REDDIT_CLIENT_ID=      # optional — Reddit script app
 REDDIT_CLIENT_SECRET=  # optional — Reddit script app
@@ -73,7 +74,7 @@ Copy `.env.example` → `.env` and fill in keys. `.env` is gitignored.
 
 ## Editable AI prompt
 
-`ai-agent-conf/agent-prompt.md` is the system prompt for Gemini. Edit it freely to change what the AI searches for, the output format, tone, etc. Changes take effect immediately (no server restart needed).
+`ai-agent-conf/agent-prompt.md` is the system prompt. Edit it freely to change what the AI searches for, the output format, tone, etc. Changes take effect immediately (no server restart needed).
 
 ## Frontend structure
 

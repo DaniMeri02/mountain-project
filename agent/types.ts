@@ -45,6 +45,7 @@ export interface AgentResponse {
   sources: string[];
   generatedAt: string;   // ISO-8601
   expiresAt: string;     // ISO-8601
+  modelUsed?: string;
 }
 
 // ─── Wikidata SPARQL ──────────────────────────────────────────────────────────

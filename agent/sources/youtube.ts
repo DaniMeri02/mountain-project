@@ -11,7 +11,8 @@ function buildSearchQuery(input: AgentInput): string {
   if (input.type === 'hut' || input.type === 'bivouac') {
     return `${input.name} rifugio montagna`;
   }
-  return `${input.name} montagna escursione`;
+  // Peaks: dropping "montagna" reduces over-filtering — the name alone is specific enough
+  return `${input.name} escursione`;
 }
 
 /**
@@ -41,11 +42,6 @@ async function fetchFullSnippets(
   }
 }
 
-/**
- * Filters a raw YouTube description to keep only trail-relevant content.
- * Removes logistical paragraphs (parking, driving directions) that aren't
- * useful for a mountain guide.
- */
 // Section headers that mark logistical content (parking/driving) — not useful for a trail guide
 const SKIP_HEADER = /^(ACCESSO|PARCHEGGIO|COME ARRIVARE|DOVE PARCHEGGIARE)\s*:/i;
 // Inline keywords that identify a parking-logistics paragraph even without a header
@@ -80,19 +76,17 @@ export async function fetchYouTubeVideos(input: AgentInput): Promise<SourceResul
       signal: AbortSignal.timeout(10_000),
     });
 
-    if (!response.ok) {
-      return { sourceName: 'YouTube', content: '', success: false };
-    }
-
+    // Always parse JSON — YouTube returns error details in JSON even on non-2xx
     const data = (await response.json()) as YouTubeSearchResponse;
 
-    if (data.error) {
-      return { sourceName: 'YouTube', content: '', success: false };
+    if (!response.ok || data.error) {
+      const errMsg = data.error?.message ?? `HTTP ${response.status}`;
+      return { sourceName: 'YouTube', content: `API error: ${errMsg}`, success: false };
     }
 
     const items = data.items ?? [];
     if (items.length === 0) {
-      return { sourceName: 'YouTube', content: '', success: false };
+      return { sourceName: 'YouTube', content: `No results for query: "${query}"`, success: false };
     }
 
     // Extract video IDs from the top 2 results and fetch their full descriptions
@@ -122,7 +116,8 @@ export async function fetchYouTubeVideos(input: AgentInput): Promise<SourceResul
       .join('\n\n');
 
     return { sourceName: 'YouTube', content: formatted, success: true };
-  } catch {
-    return { sourceName: 'YouTube', content: '', success: false };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { sourceName: 'YouTube', content: `Error: ${msg}`, success: false };
   }
 }

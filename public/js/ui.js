@@ -34,6 +34,17 @@ function renderAltitudeText(elevation, isLoading) {
   return 'Not available';
 }
 
+const AI_MODELS = [
+  { slug: 'llama-3.3-70b-versatile',                    label: 'Llama 3.3 70B (Groq) — Consigliato' },
+  { slug: 'openai/gpt-oss-120b',                        label: 'GPT-OSS 120B (Groq)' },
+  { slug: 'meta-llama/llama-4-scout-17b-16e-instruct',  label: 'Llama 4 Scout 17B (Groq)' },
+  { slug: 'qwen/qwen3-32b',                             label: 'Qwen3 32B (Groq)' },
+  { slug: 'gemini-2.5-flash',                           label: 'Gemini 2.5 Flash (Google)' },
+  { slug: 'gemini-2.5-flash-lite',                      label: 'Gemini 2.5 Flash-Lite (Google)' },
+  { slug: 'google/gemma-4-31b-it:free',                 label: 'Gemma 4 31B (OpenRouter)' },
+  { slug: 'meta-llama/llama-3.3-70b-instruct:free',     label: 'Llama 3.3 70B (OpenRouter)' },
+];
+
 export function updatePanel(props, coordinates) {
   const panel = document.getElementById('panel');
   
@@ -77,6 +88,12 @@ export function updatePanel(props, coordinates) {
       <p id="ai-intro" style="font-size: 0.9rem; color: #666; margin-bottom: 10px;">
         Genera una descrizione completa con difficoltà, accesso, informazioni pratiche e dati da fonti web.
       </p>
+      <div style="margin-bottom: 8px;">
+        <label for="ai-model-select" style="font-size: 0.82rem; color: #666; display: block; margin-bottom: 4px;">Modello AI:</label>
+        <select id="ai-model-select" style="width: 100%; padding: 6px 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 0.82rem; color: #333; background: white; cursor: pointer;">
+          ${AI_MODELS.map((m, i) => `<option value="${m.slug}"${i === 0 ? ' selected' : ''}>${m.label}</option>`).join('\n          ')}
+        </select>
+      </div>
       <button id="generate-ai-btn" class="ai-magic-btn">✨ Genera AI Guide</button>
 
       <div id="ai-loading" style="display: none; text-align: center; color: #666; padding: 12px 0;">
@@ -120,12 +137,13 @@ export function updatePanel(props, coordinates) {
     if (resultSection) resultSection.style.display = 'none';
 
     const endpoint = forceRegenerate ? '/api/ai/research/regenerate' : '/api/ai/research';
+    const modelSlug = document.getElementById('ai-model-select')?.value ?? null;
 
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(aiPayload),
+        body: JSON.stringify({ ...aiPayload, modelSlug }),
       });
 
       if (!response.ok) {
@@ -137,8 +155,13 @@ export function updatePanel(props, coordinates) {
       if (loadingDiv) loadingDiv.style.display = 'none';
       if (resultSection) resultSection.style.display = 'block';
 
-      // The AI returns HTML directly — inject it
-      if (resultContent) resultContent.innerHTML = data.description ?? '';
+      if (resultContent) {
+        let html = data.description ?? '';
+        if (data.modelUsed) {
+          html += `<p style="font-size:0.75rem; color:#aaa; margin-top:14px; padding-top:8px; border-top:1px solid #f0f0f0;">🤖 Generato da: ${data.modelUsed}</p>`;
+        }
+        resultContent.innerHTML = html;
+      }
 
       // Show metadata row: cache status + sources used
       if (metaDiv) {

@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import type { Pool } from 'pg';
@@ -10,13 +9,125 @@ import { fetchRifugiData } from './sources/rifugi-scraper';
 import { fetchFerrate365Data } from './sources/ferrate365-scraper';
 import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
-import { fetchFacebookPosts } from './sources/facebook';
 import { fetchKomootData } from './sources/komoot';
 // TripAdvisor (maxcopell~tripadvisor) charges per-run on top of compute units — disabled
 // Facebook (apify~facebook-posts/groups-scraper) — disabled: Apify credits exhausted
 import type { AgentInput, AgentResponse, SourceResult } from './types';
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+export interface AiModel {
+  slug: string;
+  label: string;
+  base: string;
+  key: string;
+}
+
+/** Ranked model list — first entry is used by default, others are tried in order on failure. */
+export const AI_MODELS: AiModel[] = [
+  {
+    slug: 'llama-3.3-70b-versatile',
+    label: 'Llama 3.3 70B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
+  },
+  {
+    slug: 'openai/gpt-oss-120b',
+    label: 'GPT-OSS 120B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
+  },
+  {
+    slug: 'meta-llama/llama-4-scout-17b-16e-instruct',
+    label: 'Llama 4 Scout 17B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
+  },
+  {
+    slug: 'qwen/qwen3-32b',
+    label: 'Qwen3 32B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
+  },
+  {
+    slug: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash (Google)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    key: 'GEMINI_API_KEY',
+  },
+  {
+    slug: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite (Google)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    key: 'GEMINI_API_KEY',
+  },
+  {
+    slug: 'google/gemma-4-31b-it:free',
+    label: 'Gemma 4 31B (OpenRouter)',
+    base: 'https://openrouter.ai/api/v1',
+    key: 'OPENROUTER_API_KEY',
+  },
+  {
+    slug: 'meta-llama/llama-3.3-70b-instruct:free',
+    label: 'Llama 3.3 70B (OpenRouter)',
+    base: 'https://openrouter.ai/api/v1',
+    key: 'OPENROUTER_API_KEY',
+  },
+];
+
+interface ChatCompletionResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  error?: { message: string; code?: number | string };
+}
+
+async function callAiModel(
+  model: AiModel,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<string> {
+  const apiKey = process.env[model.key];
+  if (!apiKey) throw new Error(`API key not set: ${model.key}`);
+
+  const res = await fetch(`${model.base}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model.slug,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  const data = (await res.json()) as ChatCompletionResponse;
+
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    const err = new Error(msg) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
+
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Empty response from model');
+  return text;
+}
+
+/**
+ * Returns true if the error warrants trying the next model in the fallback chain.
+ * Returns false for errors that indicate a client-side mistake (bad key, malformed request, etc.)
+ */
+function shouldCascade(err: unknown): boolean {
+  const status = (err as { status?: number }).status;
+  if (status == null) return true;  // network error / timeout — transient
+  if (status === 429) return true;  // rate-limited — next model may have quota
+  if (status >= 500) return true;   // server overloaded — transient
+  return false;                     // 4xx client errors — bad key or request bug, fail fast
+}
+
 const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
 
 function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
@@ -26,7 +137,7 @@ function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
     `AGENT SOURCES DUMP — ${new Date().toISOString()}`,
     separator,
     '',
-    '>>> PROMPT SENT TO GEMINI (exactly as Gemini reads it):',
+    '>>> PROMPT SENT TO AI (exactly as the model reads it):',
     '',
     userMessage,
     '',
@@ -46,10 +157,6 @@ function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
   writeFileSync(DUMP_FILE, lines.join('\n'), 'utf8');
 }
 
-/**
- * Builds the user-turn prompt that Gemini receives.
- * The system prompt (instructions) is passed separately via systemInstruction.
- */
 export function buildUserMessage(input: AgentInput, results: SourceResult[]): string {
   const header = [
     `Nome: ${input.name}`,
@@ -76,22 +183,18 @@ export function buildUserMessage(input: AgentInput, results: SourceResult[]): st
 
 export class AgentOrchestrator {
   private readonly cache: AiDescriptionCache;
-  private readonly gemini: GoogleGenerativeAI;
 
   constructor(pool: Pool) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set. Add it to your .env file.');
-    }
-
     this.cache = new AiDescriptionCache(pool);
-    this.gemini = new GoogleGenerativeAI(apiKey);
   }
 
-  async generate(input: AgentInput, forceRegenerate = false): Promise<AgentResponse> {
+  async generate(
+    input: AgentInput,
+    forceRegenerate = false,
+    preferredModelSlug?: string,
+  ): Promise<AgentResponse> {
     const cacheKey = buildCacheKey(input);
 
-    // Return cached result unless explicitly bypassed
     if (!forceRegenerate) {
       const cached = await this.cache.get(cacheKey);
       if (cached) {
@@ -105,7 +208,6 @@ export class AgentOrchestrator {
       }
     }
 
-    // Fetch all sources in parallel; each source handles its own errors gracefully
     const settled = await Promise.allSettled([
       fetchWikidata(input),
       fetchOverpassData(input),
@@ -120,46 +222,43 @@ export class AgentOrchestrator {
     const results: SourceResult[] = settled.map((outcome) =>
       outcome.status === 'fulfilled'
         ? outcome.value
-        : { sourceName: 'unknown', content: '', success: false }
+        : { sourceName: 'unknown', content: '', success: false },
     );
 
-    const successfulSources = results
-      .filter((r) => r.success)
-      .map((r) => r.sourceName);
+    const successfulSources = results.filter((r) => r.success).map((r) => r.sourceName);
 
-    // Load the editable system prompt from disk (cached in memory after first read)
     const systemPrompt = loadAgentPrompt();
     const userMessage = buildUserMessage(input, results);
-
-    // Dump all raw source data to file for inspection before Gemini processes it
     writeSourcesDump(userMessage, results);
 
-    // Try each model in order; fall back to the next on 503 (transient overload)
-    let geminiResult;
+    // Move preferred model to front while preserving ranked fallback order
+    const orderedModels = [...AI_MODELS];
+    if (preferredModelSlug) {
+      const prefIdx = orderedModels.findIndex((m) => m.slug === preferredModelSlug);
+      if (prefIdx > 0) {
+        const [preferred] = orderedModels.splice(prefIdx, 1);
+        orderedModels.unshift(preferred);
+      }
+    }
+
+    let description: string | undefined;
+    let modelUsed: string | undefined;
     let lastError: unknown;
-    for (const modelName of GEMINI_MODELS) {
-      const model = this.gemini.getGenerativeModel({
-        model: modelName,
-        systemInstruction: systemPrompt,
-      });
+
+    for (const model of orderedModels) {
       try {
-        geminiResult = await model.generateContent(userMessage);
+        description = await callAiModel(model, systemPrompt, userMessage);
+        modelUsed = model.label;
         break;
       } catch (err: unknown) {
         lastError = err;
-        const is503 = err instanceof Error && (err as { status?: number }).status === 503;
-        if (!is503) throw err;
-        // 503 on this model — wait briefly then try the next one
-        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        if (!shouldCascade(err)) throw err;
       }
     }
-    if (!geminiResult) throw lastError;
-    const description = geminiResult.response.text();
 
-    // Store in cache (upsert — handles both first-time and forced regeneration)
+    if (!description || !modelUsed) throw lastError;
+
     await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
-
-    // Re-read the expiry from DB for an accurate timestamp in the response
     const stored = await this.cache.get(cacheKey);
     const expiresAt = stored?.expiresAt ?? new Date(Date.now() + 48 * 60 * 60 * 1_000);
 
@@ -169,6 +268,7 @@ export class AgentOrchestrator {
       sources: successfulSources,
       generatedAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
+      modelUsed,
     };
   }
 }

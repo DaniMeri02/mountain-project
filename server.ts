@@ -370,6 +370,7 @@ type ResearchBody = {
   osm_id?: string | number | null;
   lat?: number | null;
   lng?: number | null;
+  modelSlug?: string | null;
 };
 
 const researchBodySchema = {
@@ -383,12 +384,13 @@ const researchBodySchema = {
       osm_id: {},
       lat: { type: ['number', 'null'] },
       lng: { type: ['number', 'null'] },
+      modelSlug: { type: ['string', 'null'] },
     },
   },
 } as const;
 
 // Lazy singleton — created on the first AI request so startup never fails
-// if GEMINI_API_KEY is missing (it will fail gracefully at request time).
+// if AI provider keys are missing (they will fail gracefully at request time).
 let orchestrator: AgentOrchestrator | null = null;
 
 function getOrchestrator(): AgentOrchestrator {
@@ -402,9 +404,13 @@ fastify.post<{ Body: ResearchBody }>(
   '/api/ai/research',
   { schema: researchBodySchema },
   async (request, reply) => {
-    const { name, type, elevation, osm_id, lat, lng } = request.body;
+    const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
     try {
-      return await getOrchestrator().generate({ name, type, elevation, osm_id, lat, lng });
+      return await getOrchestrator().generate(
+        { name, type, elevation, osm_id, lat, lng },
+        false,
+        modelSlug ?? undefined,
+      );
     } catch (error) {
       fastify.log.error(error);
       reply.status(500).send({ error: 'AI generation failed. Check server logs.' });
@@ -416,11 +422,12 @@ fastify.post<{ Body: ResearchBody }>(
   '/api/ai/research/regenerate',
   { schema: researchBodySchema },
   async (request, reply) => {
-    const { name, type, elevation, osm_id, lat, lng } = request.body;
+    const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
     try {
       return await getOrchestrator().generate(
         { name, type, elevation, osm_id, lat, lng },
-        true   // forceRegenerate = true — bypasses cache
+        true,
+        modelSlug ?? undefined,
       );
     } catch (error) {
       fastify.log.error(error);
