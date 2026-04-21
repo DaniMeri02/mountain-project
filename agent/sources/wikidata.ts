@@ -3,11 +3,11 @@ import type { AgentInput, SourceResult, WikidataRow, WikidataSparqlResponse } fr
 const ENDPOINT = 'https://query.wikidata.org/sparql';
 
 /** Escape a string to be safely embedded in a SPARQL string literal. */
-function sparqlEscape(value: string): string {
+export function sparqlEscape(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
-function formatRow(row: WikidataRow): string {
+export function formatRow(row: WikidataRow): string {
   const parts: string[] = [];
 
   if (row.description?.value) {

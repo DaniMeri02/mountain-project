@@ -1,0 +1,15 @@
+{
+  "results": {
+    "bindings": [
+      {
+        "item": { "type": "uri", "value": "http://www.wikidata.org/entity/Q123456" },
+        "itemLabel": { "type": "literal", "value": "Rifugio Albani" },
+        "description": { "type": "literal", "value": "Rifugio alpino nelle Alpi Orobie" },
+        "elevation": { "type": "literal", "value": "1939" },
+        "inception": { "type": "literal", "value": "1955-01-01T00:00:00Z" },
+        "website": { "type": "uri", "value": "https://rifugioalbani.it" },
+        "wikipedia": { "type": "uri", "value": "https://it.wikipedia.org/wiki/Rifugio_Albani" }
+      }
+    ]
+  }
+}

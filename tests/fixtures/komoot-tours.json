@@ -1,0 +1,32 @@
+{
+  "_embedded": {
+    "items": [
+      {
+        "id": "t1001",
+        "name": "Hike to Rifugio Albani",
+        "sport": "hike",
+        "distance": 12500,
+        "elevation_up": 750,
+        "difficulty": { "grade": "moderate" },
+        "_embedded": {
+          "tour_description": {
+            "text": "A beautiful hike through the Bergamo Alps with stunning views of the surrounding peaks and valleys below. The trail winds through alpine meadows and rocky terrain before reaching the refuge at 1939 metres. The path is well-marked and suitable for experienced hikers. Views of the Orobie range are spectacular throughout the ascent, particularly in the final stretch above the treeline where the panorama opens up fully."
+          }
+        }
+      },
+      {
+        "id": "t1002",
+        "name": "Loop via Passo della Manina",
+        "sport": "hike",
+        "distance": 18000,
+        "elevation_up": 1100,
+        "difficulty": { "grade": "difficult" },
+        "_embedded": {
+          "tour_description": {
+            "text": "A challenging loop hike for experienced mountain walkers seeking high-altitude adventure in the Bergamo Prealps. The route crosses the Passo della Manina at 2169 metres and descends via the northern ridge, offering diverse terrain including grassy slopes, scree fields and a short via ferrata section near the summit. Total elevation gain exceeds 1100 metres — expect a full-day commitment of 7 to 8 hours."
+          }
+        }
+      }
+    ]
+  }
+}

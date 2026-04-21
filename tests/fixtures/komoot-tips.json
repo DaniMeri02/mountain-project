@@ -1,0 +1,26 @@
+{
+  "_embedded": {
+    "items": [
+      {
+        "text": "Ottimo rifugio, personale gentile.",
+        "translated_text": "Excellent refuge, friendly staff.",
+        "rating": { "up": 42, "down": 1 }
+      },
+      {
+        "text": "Prenotare in anticipo durante l'estate.",
+        "translated_text": "Book in advance during summer.",
+        "rating": { "up": 28, "down": 0 }
+      },
+      {
+        "text": "Ottima cucina locale.",
+        "translated_text": "Excellent local cuisine.",
+        "rating": { "up": 15, "down": 2 }
+      },
+      {
+        "text": "Questo consiglio non dovrebbe apparire.",
+        "translated_text": "This tip should not appear — it is the 4th.",
+        "rating": { "up": 5, "down": 0 }
+      }
+    ]
+  }
+}

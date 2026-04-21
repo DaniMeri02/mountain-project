@@ -50,7 +50,7 @@ function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
  * Builds the user-turn prompt that Gemini receives.
  * The system prompt (instructions) is passed separately via systemInstruction.
  */
-function buildUserMessage(input: AgentInput, results: SourceResult[]): string {
+export function buildUserMessage(input: AgentInput, results: SourceResult[]): string {
   const header = [
     `Nome: ${input.name}`,
     `Tipo: ${input.type}`,

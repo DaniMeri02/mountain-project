@@ -14,7 +14,10 @@
     "export:ferrata": "tsx scripts/export-via-ferrata.ts",
     "import:ferrata": "tsx scripts/import-via-ferrata.ts",
     "build": "esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@fastify/static": "^9.0.0",
@@ -27,8 +30,10 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "esbuild": "^0.28.0",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^2.1.9"
   }
 }

@@ -42,7 +42,7 @@ function getErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-function parseBBox(query: BBoxQuery): ParsedBBox | null {
+export function parseBBox(query: BBoxQuery): ParsedBBox | null {
   const minLng = Number(query.minLng);
   const minLat = Number(query.minLat);
   const maxLng = Number(query.maxLng);
@@ -449,4 +449,8 @@ const start = async () => {
   }
 };
 
-start();
+export { fastify };
+
+if (require.main === module) {
+  start();
+}

@@ -1,0 +1,30 @@
+{
+  "_embedded": {
+    "items": [
+      {
+        "id": 123456,
+        "base_name": "Rifugio Albani",
+        "name": "Albani Mountain Hut",
+        "category": "hut",
+        "intro": "<p>A beautiful mountain refuge in the Bergamo Alps at 1939m.</p>",
+        "start_point": { "lat": 45.9, "lng": 9.8, "alt": 1939 }
+      },
+      {
+        "id": 789012,
+        "base_name": "Ludwigsburg Hut at Albani Lake",
+        "name": "Ludwigsburg Hut",
+        "category": "hut",
+        "intro": null,
+        "start_point": { "lat": 45.91, "lng": 9.81, "alt": 2100 }
+      },
+      {
+        "id": 345678,
+        "base_name": "Monte Rosso",
+        "name": "Monte Rosso",
+        "category": "mountain",
+        "intro": null,
+        "start_point": { "lat": 45.92, "lng": 9.82, "alt": 2500 }
+      }
+    ]
+  }
+}

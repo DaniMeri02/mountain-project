@@ -5,7 +5,7 @@ const BASE = 'https://api.komoot.de/v007';
 // Expand search radius in steps — tight first to avoid false name matches
 const SEARCH_RADII = [300, 800, 2_000];
 
-function normalize(s: string): string {
+export function normalize(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
