@@ -279,10 +279,27 @@ body.map-fullscreen #panel {
   background: linear-gradient(135deg, #d35400, #c0392b);
 }
 
+@keyframes map-click-ring-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px #CC00FF, 0 0 14px rgba(204, 0, 255, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 12px #CC00FF, 0 0 28px rgba(204, 0, 255, 0.5), 0 0 48px rgba(204, 0, 255, 0.15);
+    transform: scale(1.15);
+  }
+}
+
+@keyframes map-click-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 5px #CC00FF); }
+  50%       { filter: drop-shadow(0 0 10px #CC00FF); }
+}
+
 .map-click-ping {
   position: relative;
-  width: 14px;
-  height: 22px;
+  width: 20px;
+  height: 30px;
+  animation: map-click-glow-pulse 1.4s ease-in-out infinite;
 }
 
 .map-click-ping::before {
@@ -290,26 +307,26 @@ body.map-fullscreen #panel {
   position: absolute;
   top: 0;
   left: 0;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   box-sizing: border-box;
-  background: #6f7780;
-  border: 2px solid #f5f7fa;
-  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+  background: #CC00FF;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  animation: map-click-ring-pulse 1.4s ease-in-out infinite;
 }
 
 .map-click-ping::after {
   content: '';
   position: absolute;
   left: 50%;
-  top: 12px;
+  top: 17px;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 8px solid #6f7780;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 11px solid #CC00FF;
 }
 
 /* POI panel badge system */
