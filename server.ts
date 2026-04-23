@@ -3,7 +3,8 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import path from 'path';
 import { Pool } from 'pg';
-import { AgentOrchestrator } from './agent/orchestrator';
+import { AgentOrchestrator, AI_MODELS } from './agent/orchestrator';
+import type { PoiType } from './agent/types';
 
 const fastify = Fastify({ logger: true });
 
@@ -407,7 +408,7 @@ fastify.post<{ Body: ResearchBody }>(
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
     try {
       return await getOrchestrator().generate(
-        { name, type, elevation, osm_id, lat, lng },
+        { name, type: type as PoiType, elevation, osm_id, lat, lng },
         false,
         modelSlug ?? undefined,
       );
@@ -425,7 +426,7 @@ fastify.post<{ Body: ResearchBody }>(
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
     try {
       return await getOrchestrator().generate(
-        { name, type, elevation, osm_id, lat, lng },
+        { name, type: type as PoiType, elevation, osm_id, lat, lng },
         true,
         modelSlug ?? undefined,
       );
@@ -435,6 +436,10 @@ fastify.post<{ Body: ResearchBody }>(
     }
   }
 );
+
+fastify.get('/api/ai/models', async () => {
+  return AI_MODELS.map(m => ({ slug: m.slug, label: m.label }));
+});
 
 // Register the plugin to serve static files from the 'public' folder
 fastify.register(fastifyStatic, {

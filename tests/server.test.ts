@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Pool } from 'pg';
-import { AgentOrchestrator } from './agent/orchestrator';
+import { AgentOrchestrator } from '../agent/orchestrator';
 
 // Mock pg so server.ts can load without a real database
 vi.mock('pg', () => ({

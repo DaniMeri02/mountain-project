@@ -312,3 +312,61 @@ body.map-fullscreen #panel {
   border-top: 8px solid #6f7780;
 }
 
+/* POI panel badge system */
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: white;
+}
+.badge-type { background-color: #2c3e50; }
+.badge-elevation { background-color: #7f8c8d; margin-left: 5px; }
+.badge-coordinates { background-color: #2980b9; margin-left: 5px; }
+.panel-badges { margin-bottom: 20px; }
+.panel-divider { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+.panel-info-line { margin: 0 0 10px 0; }
+.panel-info-secondary { margin: 0; color: #666; font-size: 0.9rem; }
+
+/* AI Guide section */
+.ai-container { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }
+.ai-section-title { margin-top: 0; font-size: 1.1rem; color: #333; }
+.ai-intro-text { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
+.ai-model-wrapper { margin-bottom: 8px; }
+.ai-model-label { font-size: 0.82rem; color: #666; display: block; margin-bottom: 4px; }
+.ai-model-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #333;
+  background: white;
+  cursor: pointer;
+}
+.ai-loading { text-align: center; color: #666; padding: 12px 0; }
+.ai-result { margin-top: 12px; }
+.ai-result-content { font-size: 0.95rem; line-height: 1.6; color: #333; }
+.ai-meta-row { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e9ecef; }
+.ai-meta-text { font-size: 0.8rem; }
+.ai-regenerate-btn {
+  margin-top: 10px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ai-model-used-note {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-top: 14px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+.ai-cache-cached { color: #888; }
+.ai-cache-fresh { color: #27ae60; }
+.ai-error-msg { color: #e74c3c; font-weight: bold; }
+

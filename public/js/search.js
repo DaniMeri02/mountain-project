@@ -1,62 +1,7 @@
 import { updatePanel } from './ui.js';
+import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation.js';
 
 let latestSearchSelectionToken = 0;
-
-function hasValidElevationValue(elevation) {
-  const numericElevation = Number(elevation);
-  if (Number.isFinite(numericElevation)) {
-    return numericElevation > 0;
-  }
-
-  if (typeof elevation === 'string') {
-    const trimmed = elevation.trim();
-    if (!trimmed || trimmed === 'N/D') {
-      return false;
-    }
-
-    const parsed = Number(trimmed);
-    if (Number.isFinite(parsed)) {
-      return parsed > 0;
-    }
-
-    return true;
-  }
-
-  return false;
-}
-
-function queryElevationFromTerrain(map, coordinates) {
-  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
-    return null;
-  }
-
-  const value = map.queryTerrainElevation([coordinates.lng, coordinates.lat], { exaggerated: false });
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-
-  return Math.round(value);
-}
-
-async function resolveElevationFromCoordinates(map, coordinates) {
-  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
-    return null;
-  }
-
-  // DEM tiles may still be loading; retry briefly before giving up.
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const elevation = queryElevationFromTerrain(map, coordinates);
-    if (elevation !== null) {
-      return elevation;
-    }
-
-    await new Promise((resolve) => {
-      window.setTimeout(resolve, 140);
-    });
-  }
-
-  return null;
-}
 
 function waitForMapSettle(map, timeoutMs = 1800) {
   return new Promise((resolve) => {
@@ -183,7 +128,6 @@ export async function initSearch(map) {
     }
 
     updatePanel({ ...panelProps, elevation: derivedElevation }, coordinates);
-
   }
 
   searchBox.addEventListener('input', (e) => {
@@ -199,7 +143,9 @@ export async function initSearch(map) {
     debounceTimer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const matches = await res.json();
+        if (!Array.isArray(matches)) throw new Error('Unexpected search response shape');
         lastMatches = matches;
 
         if (matches.length > 0) {
@@ -215,21 +161,29 @@ export async function initSearch(map) {
               meta = `${feat.elevation} m`;
             }
 
-            li.innerHTML = meta
-              ? `${typeIcon} <strong>${feat.name}</strong> <small>(${meta})</small>`
-              : `${typeIcon} <strong>${feat.name}</strong>`;
-            
+            // Build with DOM APIs to avoid XSS — feat.name comes from the database
+            li.appendChild(document.createTextNode(`${typeIcon} `));
+            const nameEl = document.createElement('strong');
+            nameEl.textContent = feat.name;
+            li.appendChild(nameEl);
+            if (meta) {
+              li.appendChild(document.createTextNode(' '));
+              const metaEl = document.createElement('small');
+              metaEl.textContent = `(${meta})`;
+              li.appendChild(metaEl);
+            }
+
             li.addEventListener('click', () => {
               goToFeature(feat);
             });
-            
+
             searchResults.appendChild(li);
           });
         }
       } catch (err) {
         console.error("Error searching PostGIS DB: ", err);
       }
-    }, 300); // Wait 300ms after user stops typing
+    }, 300);
   });
 
   searchBox.addEventListener('keydown', (e) => {
@@ -241,7 +195,7 @@ export async function initSearch(map) {
 
   // Hide dropdown if clicked outside
   document.addEventListener('click', (e) => {
-    if(e.target.id !== 'search-box') {
+    if (e.target.id !== 'search-box') {
       searchResults.style.display = 'none';
     }
   });

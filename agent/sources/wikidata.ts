@@ -130,7 +130,8 @@ export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
 
     const coordItemUrl = coordData.results?.bindings[0]?.item?.value;
     return { sourceName: 'Wikidata (coordinate)', content: coordFormatted, success: true, url: coordItemUrl };
-  } catch {
+  } catch (err) {
+    console.error('[Wikidata]', err);
     return { sourceName: 'Wikidata', content: '', success: false };
   }
 }

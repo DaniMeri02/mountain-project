@@ -73,7 +73,8 @@ export async function fetchOverpassData(input: AgentInput): Promise<SourceResult
     const osmType = element.type === 'relation' ? 'relation' : element.type === 'way' ? 'way' : 'node';
     const osmUrl = `https://www.openstreetmap.org/${osmType}/${element.id}`;
     return { sourceName: 'OpenStreetMap (tags)', content: formatted, success: true, url: osmUrl };
-  } catch {
+  } catch (err) {
+    console.error('[OpenStreetMap]', err);
     return { sourceName: 'OpenStreetMap', content: '', success: false };
   }
 }

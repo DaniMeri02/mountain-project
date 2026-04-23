@@ -1,6 +1,6 @@
 // ─── POI input ───────────────────────────────────────────────────────────────
 
-export type PoiType = 'peak' | 'hut' | 'bivouac' | 'ferrata' | string;
+export type PoiType = 'peak' | 'hut' | 'bivouac' | 'ferrata';
 
 export interface AgentInput {
   name: string;

@@ -1,5 +1,6 @@
 import { load } from 'cheerio';
 import type { AgentInput, SourceResult } from '../types';
+import { fetchHtml, truncateAtWord } from './http';
 
 const LISTING_PAGES = [
   'https://rifugi.bergamo.it',  // Bergamo
@@ -10,12 +11,6 @@ const LISTING_PAGES = [
 ] as const;
 
 const LOMBARDIA_HOST = 'rifugi.lombardia.it';
-
-const FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (compatible; MountainPortal/1.0; personal-project)',
-  Accept: 'text/html,application/xhtml+xml',
-  'Accept-Language': 'it-IT,it;q=0.9',
-} as const;
 
 // In-memory cache: listingUrl → parsed hut entries (static pages, fetch once per process)
 const indexCache = new Map<string, { text: string; url: string }[]>();
@@ -54,17 +49,8 @@ async function buildHutIndex(listingUrl: string): Promise<{ text: string; url: s
     return indexCache.get(listingUrl)!;
   }
 
-  let html: string;
-  try {
-    const res = await fetch(listingUrl, {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) return [];
-    html = await res.text();
-  } catch {
-    return [];
-  }
+  const html = await fetchHtml(listingUrl);
+  if (!html) return [];
 
   const $ = load(html);
   const entries: { text: string; url: string }[] = [];
@@ -165,17 +151,8 @@ function extractSideboxes($: ReturnType<typeof load>): string {
  * the main descriptive text, or null on failure.
  */
 async function scrapeDetailPage(url: string): Promise<string | null> {
-  let html: string;
-  try {
-    const res = await fetch(url, {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) return null;
-    html = await res.text();
-  } catch {
-    return null;
-  }
+  const html = await fetchHtml(url);
+  if (!html) return null;
 
   const $ = load(html);
 
@@ -192,7 +169,7 @@ async function scrapeDetailPage(url: string): Promise<string | null> {
 
   const parts: string[] = [];
   if (sideboxText) parts.push(sideboxText);
-  if (mainText.length > 150) parts.push(mainText.substring(0, 2_000));
+  if (mainText.length > 150) parts.push(truncateAtWord(mainText, 2_000));
 
   const combined = parts.join('\n\n');
   return combined.length > 50 ? combined : null;

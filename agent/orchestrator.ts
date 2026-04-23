@@ -24,14 +24,20 @@ export interface AiModel {
 /** Ranked model list — first entry is used by default, others are tried in order on failure. */
 export const AI_MODELS: AiModel[] = [
   {
-    slug: 'llama-3.3-70b-versatile',
-    label: 'Llama 3.3 70B (Groq)',
+    slug: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash (Google)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    key: 'GEMINI_API_KEY',
+  },
+  {
+    slug: 'qwen/qwen3-32b',
+    label: 'Qwen3 32B (Groq)',
     base: 'https://api.groq.com/openai/v1',
     key: 'GROQ_API_KEY',
   },
   {
-    slug: 'openai/gpt-oss-120b',
-    label: 'GPT-OSS 120B (Groq)',
+    slug: 'llama-3.3-70b-versatile',
+    label: 'Llama 3.3 70B (Groq)',
     base: 'https://api.groq.com/openai/v1',
     key: 'GROQ_API_KEY',
   },
@@ -42,16 +48,10 @@ export const AI_MODELS: AiModel[] = [
     key: 'GROQ_API_KEY',
   },
   {
-    slug: 'qwen/qwen3-32b',
-    label: 'Qwen3 32B (Groq)',
+    slug: 'openai/gpt-oss-120b',
+    label: 'GPT-OSS 120B (Groq)',
     base: 'https://api.groq.com/openai/v1',
     key: 'GROQ_API_KEY',
-  },
-  {
-    slug: 'gemini-2.5-flash',
-    label: 'Gemini 2.5 Flash (Google)',
-    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    key: 'GEMINI_API_KEY',
   },
   {
     slug: 'gemini-2.5-flash-lite',

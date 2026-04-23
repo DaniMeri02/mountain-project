@@ -1,5 +1,6 @@
 import { loadIcons } from './icons.js';
 import { updatePanel, updateCoordinatesPanel } from './ui.js';
+import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation.js';
 
 // We store the current selection to know if 3D should be applied after a style loads
 let currentMode = 'outdoors-v12';
@@ -44,56 +45,9 @@ function ensureTerrainSource(map) {
   });
 }
 
-function hasValidElevationValue(elevation) {
-  const numericElevation = Number(elevation);
-  if (Number.isFinite(numericElevation)) {
-    return numericElevation > 0;
-  }
-
-  if (typeof elevation === 'string') {
-    const trimmed = elevation.trim();
-    return trimmed !== '' && trimmed !== 'N/D';
-  }
-
-  return false;
-}
-
-function queryElevationFromTerrain(map, coordinates) {
-  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
-    return null;
-  }
-
-  const value = map.queryTerrainElevation([coordinates.lng, coordinates.lat], { exaggerated: false });
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-
-  return Math.round(value);
-}
-
-async function resolveElevationFromCoordinates(map, coordinates) {
-  if (!coordinates || typeof map.queryTerrainElevation !== 'function') {
-    return null;
-  }
-
-  // Terrain tiles are streamed; brief retries avoid empty values when data is still loading.
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const elevation = queryElevationFromTerrain(map, coordinates);
-    if (elevation !== null) {
-      return elevation;
-    }
-
-    await new Promise((resolve) => {
-      window.setTimeout(resolve, 140);
-    });
-  }
-
-  return null;
-}
-
 function getFeatureCoordinates(feature, fallbackLngLat) {
   const geometry = feature && feature.geometry;
-  if (geometry && geometry.type === 'Point' && Array.isArray(geometry.coordinates)) {
+  if (geometry && geometry.type === 'Point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
     const [lng, lat] = geometry.coordinates;
     if (Number.isFinite(Number(lng)) && Number.isFinite(Number(lat))) {
       return { lng: Number(lng), lat: Number(lat) };

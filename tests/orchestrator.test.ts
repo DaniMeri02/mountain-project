@@ -33,14 +33,6 @@ vi.mock('../agent/cache', () => ({
   AiDescriptionCache: vi.fn().mockImplementation(() => mockCacheInstance),
 }));
 
-// Gemini mock: generateContent is reassigned in beforeEach
-let mockGenerateContent: ReturnType<typeof vi.fn>;
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn().mockImplementation(() => ({
-    getGenerativeModel: vi.fn().mockImplementation(() => ({ generateContent: mockGenerateContent })),
-  })),
-}));
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const mockPool = {} as Pool;
@@ -59,10 +51,26 @@ function makeCachedResult(): CachedDescription {
   };
 }
 
+function makeAiResponse(text: string): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ choices: [{ message: { content: text } }] }),
+  } as unknown as Response;
+}
+
+function makeAiError(status: number, message: string): Response {
+  return {
+    ok: false,
+    status,
+    json: () => Promise.resolve({ error: { message } }),
+  } as unknown as Response;
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-beforeAll(() => { process.env.GEMINI_API_KEY = 'test-key'; });
-afterAll(() => { delete process.env.GEMINI_API_KEY; });
+beforeAll(() => { process.env.GROQ_API_KEY = 'test-key'; });
+afterAll(() => { delete process.env.GROQ_API_KEY; });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -73,9 +81,8 @@ beforeEach(() => {
     invalidate: vi.fn().mockResolvedValue(undefined),
   };
 
-  mockGenerateContent = vi.fn().mockResolvedValue({
-    response: { text: () => 'AI generated description' },
-  });
+  // Default: AI model returns success
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeAiResponse('AI generated description')));
 
   // Default: all sources succeed
   vi.mocked(fetchWikidata).mockResolvedValue(makeSourceResult('Wikidata'));
@@ -142,12 +149,12 @@ describe('AgentOrchestrator.generate', () => {
     expect(vi.mocked(fetchWikidata)).toHaveBeenCalled();
   });
 
-  it('calls all 7 sources, Gemini, and stores in cache on miss', async () => {
+  it('calls all 7 sources, AI model, and stores in cache on miss', async () => {
     const orch = new AgentOrchestrator(mockPool);
     await orch.generate(baseInput);
     expect(vi.mocked(fetchWikidata)).toHaveBeenCalledOnce();
     expect(vi.mocked(fetchKomootData)).toHaveBeenCalledOnce();
-    expect(mockGenerateContent).toHaveBeenCalledOnce();
+    expect(global.fetch).toHaveBeenCalledOnce();
     expect(mockCacheInstance.set).toHaveBeenCalledOnce();
   });
 
@@ -159,33 +166,23 @@ describe('AgentOrchestrator.generate', () => {
     expect(result.description).toBe('AI generated description');
   });
 
-  it('retries with second model on Gemini 503', async () => {
-    vi.useFakeTimers();
-    const err503 = Object.assign(new Error('Service overloaded'), { status: 503 });
-    mockGenerateContent = vi.fn()
-      .mockRejectedValueOnce(err503)
-      .mockResolvedValueOnce({ response: { text: () => 'Fallback description' } });
+  it('retries with second model on 503', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(makeAiError(503, 'Service overloaded'))
+      .mockResolvedValueOnce(makeAiResponse('Fallback description')),
+    );
 
     const orch = new AgentOrchestrator(mockPool);
-    const promise = orch.generate(baseInput);
-    await vi.runAllTimersAsync();
-    const result = await promise;
-    vi.useRealTimers();
+    const result = await orch.generate(baseInput);
 
     expect(result.description).toBe('Fallback description');
-    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
-  it('throws when all Gemini models return 503', async () => {
-    vi.useFakeTimers();
-    const err503 = Object.assign(new Error('Overloaded'), { status: 503 });
-    mockGenerateContent = vi.fn().mockRejectedValue(err503);
+  it('throws when all models return 503', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeAiError(503, 'Overloaded')));
 
     const orch = new AgentOrchestrator(mockPool);
-    // Attach .rejects handler BEFORE timers run to avoid unhandled rejection warning
-    const rejectExpectation = expect(orch.generate(baseInput)).rejects.toThrow();
-    await vi.runAllTimersAsync();
-    await rejectExpectation;
-    vi.useRealTimers();
+    await expect(orch.generate(baseInput)).rejects.toThrow();
   });
 });

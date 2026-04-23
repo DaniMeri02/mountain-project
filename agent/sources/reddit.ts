@@ -28,7 +28,8 @@ async function fetchAccessToken(clientId: string, clientSecret: string): Promise
 
     const data = (await response.json()) as RedditTokenResponse;
     return data.access_token ?? null;
-  } catch {
+  } catch (err) {
+    console.error('[Reddit] fetchAccessToken failed:', err);
     return null;
   }
 }
@@ -91,7 +92,8 @@ export async function fetchRedditPosts(input: AgentInput): Promise<SourceResult>
     }
 
     return { sourceName: 'Reddit', content: formatted, success: true };
-  } catch {
+  } catch (err) {
+    console.error('[Reddit]', err);
     return { sourceName: 'Reddit', content: '', success: false };
   }
 }

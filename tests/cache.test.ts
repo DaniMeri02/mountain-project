@@ -19,7 +19,7 @@ describe('buildCacheKey', () => {
 
   it('same name different case produces same key', () => {
     const a = buildCacheKey({ name: 'Rifugio Albani', type: 'hut' });
-    const b = buildCacheKey({ name: 'RIFUGIO ALBANI', type: 'HUT' });
+    const b = buildCacheKey({ name: 'RIFUGIO ALBANI', type: 'hut' });
     expect(a).toBe(b);
   });
 

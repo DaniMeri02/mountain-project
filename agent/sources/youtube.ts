@@ -37,7 +37,8 @@ async function fetchFullSnippets(
       map.set(item.id, item.snippet.description);
     }
     return map;
-  } catch {
+  } catch (err) {
+    console.error('[YouTube] fetchFullSnippets failed:', err);
     return new Map();
   }
 }
@@ -117,6 +118,7 @@ export async function fetchYouTubeVideos(input: AgentInput): Promise<SourceResul
 
     return { sourceName: 'YouTube', content: formatted, success: true };
   } catch (err: unknown) {
+    console.error('[YouTube]', err);
     const msg = err instanceof Error ? err.message : String(err);
     return { sourceName: 'YouTube', content: `Error: ${msg}`, success: false };
   }

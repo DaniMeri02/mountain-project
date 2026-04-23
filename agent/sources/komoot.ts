@@ -34,7 +34,8 @@ async function findNearbyHighlight(
     let res: Response;
     try {
       res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-    } catch {
+    } catch (err) {
+      console.error('[Komoot] highlight fetch at radius', radius, 'failed:', err);
       continue;
     }
     if (!res.ok) continue;
@@ -88,7 +89,8 @@ async function fetchNearbyFallbackTours(
       if (tours.length > 0) return { tours, sourceHighlight: h };
     }
     return { tours: [], sourceHighlight: null };
-  } catch {
+  } catch (err) {
+    console.error('[Komoot] fetchNearbyFallbackTours failed:', err);
     return { tours: [], sourceHighlight: null };
   }
 }
@@ -136,7 +138,8 @@ async function fetchTourFullDescription(tourId: string, listText: string): Promi
     return chosen
       .map((f) => f.answer.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 600))
       .join('\n');
-  } catch {
+  } catch (err) {
+    console.error('[Komoot] fetchTourFullDescription failed:', err);
     return listText;
   }
 }

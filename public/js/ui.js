@@ -34,30 +34,61 @@ function renderAltitudeText(elevation, isLoading) {
   return 'Not available';
 }
 
-const AI_MODELS = [
-  { slug: 'llama-3.3-70b-versatile',                    label: 'Llama 3.3 70B (Groq) — Consigliato' },
-  { slug: 'openai/gpt-oss-120b',                        label: 'GPT-OSS 120B (Groq)' },
-  { slug: 'meta-llama/llama-4-scout-17b-16e-instruct',  label: 'Llama 4 Scout 17B (Groq)' },
-  { slug: 'qwen/qwen3-32b',                             label: 'Qwen3 32B (Groq)' },
-  { slug: 'gemini-2.5-flash',                           label: 'Gemini 2.5 Flash (Google)' },
-  { slug: 'gemini-2.5-flash-lite',                      label: 'Gemini 2.5 Flash-Lite (Google)' },
-  { slug: 'google/gemma-4-31b-it:free',                 label: 'Gemma 4 31B (OpenRouter)' },
-  { slug: 'meta-llama/llama-3.3-70b-instruct:free',     label: 'Llama 3.3 70B (OpenRouter)' },
-];
+export function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-export function updatePanel(props, coordinates) {
+function safeUrl(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? url : '';
+  } catch {
+    return '';
+  }
+}
+
+// Fetch the model list from the backend — single source of truth.
+// Cached after first call; pre-warmed at module load so it's ready before first click.
+let cachedAiModels = null;
+
+async function fetchAiModels() {
+  if (cachedAiModels) return cachedAiModels;
+  try {
+    const res = await fetch('/api/ai/models');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    cachedAiModels = await res.json();
+  } catch {
+    cachedAiModels = [{ slug: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Groq)' }];
+  }
+  return cachedAiModels;
+}
+
+fetchAiModels(); // pre-warm on module load
+
+export async function updatePanel(props, coordinates) {
+  const aiModels = await fetchAiModels();
   const panel = document.getElementById('panel');
-  
+
   const typeLabel = typeof props.type === 'string' ? props.type : 'unknown';
-  const typeCapitalized = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
-  const descHTML = props.description ? `<p>${props.description}</p>` : `<p><em>No description available.</em></p>`;
-  const siteHTML = props.website ? `<p><a href="${props.website}" target="_blank">Visit website</a></p>` : '';
-  const elevationText = formatElevationLabel(props.elevation);
+  const typeCapitalized = escapeHtml(typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1));
+  const descHTML = props.description
+    ? `<p>${escapeHtml(props.description)}</p>`
+    : `<p><em>No description available.</em></p>`;
+  const safeWebsite = safeUrl(props.website);
+  const siteHTML = safeWebsite
+    ? `<p><a href="${escapeHtml(safeWebsite)}" target="_blank" rel="noopener noreferrer">Visit website</a></p>`
+    : '';
+  const elevationText = escapeHtml(formatElevationLabel(props.elevation));
   const hasElevation = elevationText !== '';
   const elevationBadgeHTML = hasElevation
-    ? `<span style="background-color: #7f8c8d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
-        ${elevationText}
-      </span>`
+    ? `<span class="badge badge-elevation">${elevationText}</span>`
     : '';
   const hasCoordinates = coordinates
     && Number.isFinite(Number(coordinates.lat))
@@ -65,45 +96,41 @@ export function updatePanel(props, coordinates) {
   const latFixed = hasCoordinates ? Number(coordinates.lat).toFixed(6) : '';
   const lngFixed = hasCoordinates ? Number(coordinates.lng).toFixed(6) : '';
   const coordinateBadgeHTML = hasCoordinates
-    ? `<span style="background-color: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 5px;">
-        ${latFixed}, ${lngFixed}
-      </span>`
+    ? `<span class="badge badge-coordinates">${latFixed}, ${lngFixed}</span>`
     : '';
 
   panel.innerHTML = `
-    <h2>${props.name}</h2>
-    <div style="margin-bottom: 20px;">
-      <span style="background-color: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
-        ${typeCapitalized}
-      </span>
+    <h2>${escapeHtml(props.name)}</h2>
+    <div class="panel-badges">
+      <span class="badge badge-type">${typeCapitalized}</span>
       ${elevationBadgeHTML}
       ${coordinateBadgeHTML}
     </div>
     ${descHTML}
     ${siteHTML}
 
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-    <div id="ai-container" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef;">
-      <h3 style="margin-top: 0; font-size: 1.1rem; color: #333;">🤖 AI Guide</h3>
-      <p id="ai-intro" style="font-size: 0.9rem; color: #666; margin-bottom: 10px;">
+    <hr class="panel-divider">
+    <div id="ai-container" class="ai-container">
+      <h3 class="ai-section-title">🤖 AI Guide</h3>
+      <p id="ai-intro" class="ai-intro-text">
         Genera una descrizione completa con difficoltà, accesso, informazioni pratiche e dati da fonti web.
       </p>
-      <div style="margin-bottom: 8px;">
-        <label for="ai-model-select" style="font-size: 0.82rem; color: #666; display: block; margin-bottom: 4px;">Modello AI:</label>
-        <select id="ai-model-select" style="width: 100%; padding: 6px 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 0.82rem; color: #333; background: white; cursor: pointer;">
-          ${AI_MODELS.map((m, i) => `<option value="${m.slug}"${i === 0 ? ' selected' : ''}>${m.label}</option>`).join('\n          ')}
+      <div class="ai-model-wrapper">
+        <label for="ai-model-select" class="ai-model-label">Modello AI:</label>
+        <select id="ai-model-select" class="ai-model-select">
+          ${aiModels.map((m, i) => `<option value="${m.slug}"${i === 0 ? ' selected' : ''}>${escapeHtml(m.label)}</option>`).join('\n          ')}
         </select>
       </div>
       <button id="generate-ai-btn" class="ai-magic-btn">✨ Genera AI Guide</button>
 
-      <div id="ai-loading" style="display: none; text-align: center; color: #666; padding: 12px 0;">
+      <div id="ai-loading" class="ai-loading" style="display: none;">
         <em>Ricerca in corso su fonti web... ⏳</em>
       </div>
 
-      <div id="ai-result" style="display: none; margin-top: 12px;">
-        <div id="ai-result-content" style="font-size: 0.95rem; line-height: 1.6; color: #333;"></div>
-        <div id="ai-meta" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e9ecef;"></div>
-        <button id="regenerate-ai-btn" style="display: none; margin-top: 10px; padding: 6px 14px; font-size: 0.85rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+      <div id="ai-result" class="ai-result" style="display: none;">
+        <div id="ai-result-content" class="ai-result-content"></div>
+        <div id="ai-meta" class="ai-meta-row"></div>
+        <button id="regenerate-ai-btn" class="ai-regenerate-btn" style="display: none;">
           🔄 Rigenera descrizione
         </button>
       </div>
@@ -129,7 +156,6 @@ export function updatePanel(props, coordinates) {
   const introP = document.getElementById('ai-intro');
 
   async function runAiRequest(forceRegenerate) {
-    // Enter loading state
     if (generateBtn) generateBtn.style.display = 'none';
     if (introP) introP.style.display = 'none';
     if (regenerateBtn) regenerateBtn.disabled = true;
@@ -156,25 +182,25 @@ export function updatePanel(props, coordinates) {
       if (resultSection) resultSection.style.display = 'block';
 
       if (resultContent) {
+        // data.description is AI-generated HTML — intentional innerHTML usage
         let html = data.description ?? '';
         if (data.modelUsed) {
-          html += `<p style="font-size:0.75rem; color:#aaa; margin-top:14px; padding-top:8px; border-top:1px solid #f0f0f0;">🤖 Generato da: ${data.modelUsed}</p>`;
+          html += `<p class="ai-model-used-note">🤖 Generato da: ${escapeHtml(data.modelUsed)}</p>`;
         }
         resultContent.innerHTML = html;
       }
 
-      // Show metadata row: cache status + sources used
       if (metaDiv) {
         const cacheLabel = data.fromCache
-          ? '<span style="color: #888;">📦 Da cache</span>'
-          : '<span style="color: #27ae60;">✨ Generato ora</span>';
+          ? '<span class="ai-cache-cached">📦 Da cache</span>'
+          : '<span class="ai-cache-fresh">✨ Generato ora</span>';
         const sourcesText = Array.isArray(data.sources) && data.sources.length > 0
-          ? ` &middot; Fonti: ${data.sources.join(', ')}`
+          ? ` &middot; Fonti: ${data.sources.map(s => escapeHtml(s)).join(', ')}`
           : '';
         const expiryText = data.expiresAt
           ? ` &middot; Scade: ${new Date(data.expiresAt).toLocaleString('it-IT')}`
           : '';
-        metaDiv.innerHTML = `<small style="font-size:0.8rem;">${cacheLabel}${sourcesText}${expiryText}</small>`;
+        metaDiv.innerHTML = `<small class="ai-meta-text">${cacheLabel}${sourcesText}${expiryText}</small>`;
       }
 
       if (regenerateBtn) {
@@ -186,10 +212,8 @@ export function updatePanel(props, coordinates) {
       if (loadingDiv) loadingDiv.style.display = 'none';
       if (resultSection) resultSection.style.display = 'block';
       if (resultContent) {
-        resultContent.innerHTML =
-          '<p style="color: #e74c3c; font-weight: bold;">Errore durante la generazione. Riprova.</p>';
+        resultContent.innerHTML = '<p class="ai-error-msg">Errore durante la generazione. Riprova.</p>';
       }
-      // Re-show generate button so user can retry
       if (generateBtn) {
         generateBtn.style.display = 'inline-block';
         generateBtn.textContent = '🔄 Riprova';
@@ -214,17 +238,12 @@ export function updateCoordinatesPanel(lng, lat, elevation, isLoading = false) {
 
   panel.innerHTML = `
     <h2>Clicked Coordinates</h2>
-    <div style="margin-bottom: 20px;">
-      <span style="background-color: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
-        Map Click
-      </span>
+    <div class="panel-badges">
+      <span class="badge badge-type">Map Click</span>
     </div>
-    <p style="margin: 0 0 10px 0;"><strong>Altitude:</strong> ${altitudeText}</p>
-    <p style="margin: 0 0 10px 0;"><strong>Latitude:</strong> ${latFixed}</p>
-    <p style="margin: 0 0 10px 0;"><strong>Longitude:</strong> ${lngFixed}</p>
-    <p style="margin: 0; color: #666; font-size: 0.9rem;">
-      Decimal format: ${latFixed}, ${lngFixed}
-    </p>
+    <p class="panel-info-line"><strong>Altitude:</strong> ${altitudeText}</p>
+    <p class="panel-info-line"><strong>Latitude:</strong> ${latFixed}</p>
+    <p class="panel-info-line"><strong>Longitude:</strong> ${lngFixed}</p>
+    <p class="panel-info-secondary">Decimal format: ${latFixed}, ${lngFixed}</p>
   `;
 }
-
