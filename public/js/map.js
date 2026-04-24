@@ -152,13 +152,15 @@ export function addMapLayers(map) {
           'hut-icon'
         ],
         'icon-size': 1,
-        'icon-allow-overlap': false, // Let Mapbox organically hide colliding icons!
+        'icon-allow-overlap': false,
         'text-allow-overlap': false,
+        'text-optional': true,
         'text-field': ['get', 'name'],
         'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 9, 7, 12, 9, 16, 11, 18, 12],
         'text-anchor': 'top',
-        'text-offset': [0, 0.6]
+        'text-offset': [0, 0.6],
+        'text-padding': 16
       },
       paint: {
         'text-color': '#4a4a4a',
