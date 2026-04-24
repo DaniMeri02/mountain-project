@@ -85,8 +85,8 @@ function setupFullscreenMapOption(mapInstance) {
     toggleBtn.setAttribute('aria-label', label);
     toggleBtn.title = label;
     toggleBtn.innerHTML = enabled
-      ? '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 1,1 7,1"/><polyline points="11,1 17,1 17,7"/><polyline points="17,11 17,17 11,17"/><polyline points="7,17 1,17 1,11"/></svg>'
-      : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 7,7 7,1"/><polyline points="11,1 11,7 17,7"/><polyline points="17,11 11,11 11,17"/><polyline points="7,17 7,11 1,11"/></svg>';
+      ? '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 7,7 7,1"/><polyline points="11,1 11,7 17,7"/><polyline points="17,11 11,11 11,17"/><polyline points="7,17 7,11 1,11"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 1,1 7,1"/><polyline points="11,1 17,1 17,7"/><polyline points="17,11 17,17 11,17"/><polyline points="7,17 1,17 1,11"/></svg>';
 
     window.dispatchEvent(new Event('layout:changed'));
 
@@ -131,6 +131,9 @@ function setupFullscreenMapOption(mapInstance) {
   }
 
   scheduleResize();
+
+  // Set initial icon (page loads in normal mode, not fullscreen)
+  setFullscreenState(false);
 }
 
 // Initialize layers and custom logic when map style loads
