@@ -35,9 +35,13 @@ export async function initSearch(map) {
     return;
   }
 
-  const FULL_PLACEHOLDER = 'Search huts, peaks, bivouacs, via ferrata...';
-  const MEDIUM_PLACEHOLDER = 'Search huts, peaks, bivouacs...';
-  const SHORT_PLACEHOLDER = 'Search...';
+  const PLACEHOLDER_TIERS = [
+    { minWidth: 280, text: 'Search huts, peaks, bivouacs, via ferrata...' },
+    { minWidth: 210, text: 'Search huts, peaks, bivouacs...' },
+    { minWidth: 150, text: 'Search huts, peaks...' },
+    { minWidth: 100, text: 'Search huts...' },
+    { minWidth: 0,   text: 'Search...' }
+  ];
 
   let debounceTimer;
   let lastMatches = [];
@@ -45,18 +49,8 @@ export async function initSearch(map) {
 
   function syncSearchPlaceholder() {
     const width = searchBox.clientWidth;
-
-    if (width >= 360) {
-      searchBox.placeholder = FULL_PLACEHOLDER;
-      return;
-    }
-
-    if (width >= 320) {
-      searchBox.placeholder = MEDIUM_PLACEHOLDER;
-      return;
-    }
-
-    searchBox.placeholder = SHORT_PLACEHOLDER;
+    const tier = PLACEHOLDER_TIERS.find(t => width >= t.minWidth);
+    searchBox.placeholder = tier.text;
   }
 
   function schedulePlaceholderSync() {
