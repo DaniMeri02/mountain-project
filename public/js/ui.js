@@ -137,6 +137,8 @@ export async function updatePanel(props, coordinates) {
     </div>
   `;
 
+  window.dispatchEvent(new Event('panel:updated'));
+
   // Build the payload once — reused for both generate and regenerate
   const aiPayload = {
     name: props.name,

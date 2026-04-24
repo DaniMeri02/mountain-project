@@ -133,7 +133,6 @@ export function addMapLayers(map) {
 
   // Add visualization layer
   if (!map.getLayer('pois-points')) {
-    const labelTextSize = window.innerWidth < 480 ? 10 : 11;
     map.addLayer({
       id: 'pois-points',
       type: 'symbol',
@@ -157,7 +156,7 @@ export function addMapLayers(map) {
         'text-allow-overlap': false,
         'text-field': ['get', 'name'],
         'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-        'text-size': labelTextSize,
+        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 7, 12, 9, 16, 11, 18, 12],
         'text-anchor': 'top',
         'text-offset': [0, 0.6]
       },

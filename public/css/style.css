@@ -237,6 +237,7 @@ body.map-fullscreen #panel {
   }
   #panel {
     min-height: 180px;
+    max-height: 45vh;
     padding: 1rem;
   }
   #top-controls {

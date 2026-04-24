@@ -84,7 +84,9 @@ function setupFullscreenMapOption(mapInstance) {
     toggleBtn.setAttribute('aria-pressed', String(enabled));
     toggleBtn.setAttribute('aria-label', label);
     toggleBtn.title = label;
-    toggleBtn.textContent = enabled ? '🗗' : '⛶';
+    toggleBtn.innerHTML = enabled
+      ? '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 1,1 7,1"/><polyline points="11,1 17,1 17,7"/><polyline points="17,11 17,17 11,17"/><polyline points="7,17 1,17 1,11"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 7,7 7,1"/><polyline points="11,1 11,7 17,7"/><polyline points="17,11 11,11 11,17"/><polyline points="7,17 7,11 1,11"/></svg>';
 
     window.dispatchEvent(new Event('layout:changed'));
 
@@ -163,3 +165,8 @@ setupFullscreenMapOption(map);
 
 // Initialize search bar functionality
 initSearch(map);
+
+// Resize map when panel content changes (e.g. POI selected, AI description loaded)
+window.addEventListener('panel:updated', () => {
+  requestAnimationFrame(() => map.resize());
+});
