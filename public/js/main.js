@@ -49,6 +49,12 @@ function setupFullscreenMapOption(mapInstance) {
   };
 
   const runTransitionResize = (durationMs = 420) => {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      mapInstance.resize();
+      return;
+    }
+
     if (transitionResizeRaf) {
       cancelAnimationFrame(transitionResizeRaf);
     }
