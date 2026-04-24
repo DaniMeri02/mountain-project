@@ -29,8 +29,9 @@ function waitForMapSettle(map, timeoutMs = 1800) {
 export async function initSearch(map) {
   const searchBox = document.getElementById('search-box');
   const searchResults = document.getElementById('search-results');
+  const searchContainer = document.getElementById('search-container');
 
-  if (!searchBox || !searchResults) {
+  if (!searchBox || !searchResults || !searchContainer) {
     return;
   }
 
@@ -50,7 +51,7 @@ export async function initSearch(map) {
       return;
     }
 
-    if (width >= 250) {
+    if (width >= 320) {
       searchBox.placeholder = MEDIUM_PLACEHOLDER;
       return;
     }
@@ -193,9 +194,9 @@ export async function initSearch(map) {
     }
   });
 
-  // Hide dropdown if clicked outside
+  // Hide dropdown when clicking outside — contains() covers touch on child <strong>/<small> nodes
   document.addEventListener('click', (e) => {
-    if (e.target.id !== 'search-box') {
+    if (!searchContainer.contains(e.target)) {
       searchResults.style.display = 'none';
     }
   });
