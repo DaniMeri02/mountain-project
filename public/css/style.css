@@ -387,3 +387,4 @@ body.map-fullscreen #panel {
 .ai-cache-fresh { color: #27ae60; }
 .ai-error-msg { color: #e74c3c; font-weight: bold; }
 
+.is-hidden { display: none; }
