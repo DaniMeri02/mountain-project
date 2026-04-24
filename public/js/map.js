@@ -155,12 +155,12 @@ export function addMapLayers(map) {
         'icon-allow-overlap': false,
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-field': ['get', 'name'],
+        'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
         'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 9, 7, 12, 9, 16, 11, 18, 12],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 10, 17, 12],
         'text-anchor': 'top',
         'text-offset': [0, 0.6],
-        'text-padding': 16
+        'text-padding': 20
       },
       paint: {
         'text-color': '#4a4a4a',

@@ -272,6 +272,10 @@ body.map-fullscreen #panel {
     right: calc(6px + var(--control-height) + 6px);
     gap: 6px;
   }
+  .menu {
+    font-size: 0.78rem;
+    flex-wrap: nowrap;
+  }
   #search-container {
     width: clamp(140px, 50vw, 260px);
   }
@@ -289,13 +293,14 @@ body.map-fullscreen #panel {
   #top-controls {
     left: 4px;
     right: calc(4px + var(--control-height) + 4px);
-    flex-wrap: wrap;
     gap: 4px;
   }
   .menu {
+    font-size: 0.74rem;
     padding: 0 8px;
-    gap: 4px 6px;
+    gap: 2px 5px;
     min-width: 0;
+    flex-wrap: nowrap;
   }
   #search-container {
     width: 100%;
