@@ -4,20 +4,22 @@ import { AgentOrchestrator } from '../agent/orchestrator';
 
 // Mock pg so server.ts can load without a real database
 vi.mock('pg', () => ({
-  Pool: vi.fn(() => ({ query: vi.fn(), end: vi.fn() })),
+  Pool: vi.fn(function () { return { query: vi.fn(), end: vi.fn() }; }),
 }));
 
 // Mock orchestrator to avoid needing a real Gemini key at import time
 vi.mock('../agent/orchestrator', () => ({
-  AgentOrchestrator: vi.fn(() => ({
-    generate: vi.fn().mockResolvedValue({
-      description: 'AI description',
-      fromCache: false,
-      sources: ['Wikidata'],
-      generatedAt: '2026-04-20T10:00:00Z',
-      expiresAt: '2026-04-22T10:00:00Z',
-    }),
-  })),
+  AgentOrchestrator: vi.fn(function () {
+    return {
+      generate: vi.fn().mockResolvedValue({
+        description: 'AI description',
+        fromCache: false,
+        sources: ['Wikidata'],
+        generatedAt: '2026-04-20T10:00:00Z',
+        expiresAt: '2026-04-22T10:00:00Z',
+      }),
+    };
+  }),
 }));
 
 // Import server AFTER mocks are registered
