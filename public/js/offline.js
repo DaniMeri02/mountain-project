@@ -168,8 +168,6 @@ function buildOpentopoUrls(bbox, zMin, zMax) {
 // ── Mapbox style cache (Path B) ──────────────────────────────────────────────
 
 const MAPBOX_STYLE = 'mapbox/outdoors-v12';
-const DEM_SOURCE = 'mapbox.mapbox-terrain-dem-v1';
-const DEM_MAXZOOM = 14;
 const GLYPH_RANGES = [
   [0, 255],
   // Mapbox glyph PBFs are stored in 256-unit ranges. Keep Latin only by default.
@@ -178,6 +176,10 @@ const GLYPH_RANGES = [
 function withToken(url) {
   const sep = url.includes('?') ? '&' : '?';
   return url + sep + 'access_token=' + mapboxgl.accessToken;
+}
+
+function httpsify(url) {
+  return url.replace(/^http:\/\//, 'https://');
 }
 
 function fillTileTemplate(template, z, x, y) {
@@ -201,6 +203,16 @@ async function fetchJson(url) {
   return res.json();
 }
 
+// Resolve a `mapbox://fonts/{user}/{fontstack}/{range}.pbf` template into HTTPS form,
+// preserving the {user} segment from the style (avoids dropping the username prefix).
+function glyphsTemplateToHttps(glyphsUrl) {
+  if (!glyphsUrl) return null;
+  if (glyphsUrl.startsWith('mapbox://fonts/')) {
+    return 'https://api.mapbox.com/fonts/v1/' + glyphsUrl.slice('mapbox://fonts/'.length);
+  }
+  return httpsify(glyphsUrl);
+}
+
 async function buildMapboxUrls(bbox, zMin, zMax) {
   const urls = new Set();
 
@@ -209,18 +221,24 @@ async function buildMapboxUrls(bbox, zMin, zMax) {
   urls.add(styleUrl);
   const styleJson = await fetchJson(styleUrl);
 
-  // 2. Vector tile sources — resolve TileJSON, enumerate tiles
+  // 2. Tile sources (vector / raster / raster-dem) — resolve TileJSON, enumerate tiles.
+  // Mapbox TileJSON returns templates on `*.tiles.mapbox.com` over HTTP — must be rewritten
+  // to HTTPS or the page (served HTTPS) blocks them as mixed content.
   const sources = styleJson.sources || {};
   for (const sourceId of Object.keys(sources)) {
     const src = sources[sourceId];
-    if (src.type !== 'vector' || !src.url || !src.url.startsWith('mapbox://')) continue;
+    if (!['vector', 'raster', 'raster-dem'].includes(src.type)) continue;
+    if (!src.url || !src.url.startsWith('mapbox://')) continue;
     const id = src.url.replace('mapbox://', '');
     const tileJsonUrl = withToken(`https://api.mapbox.com/v4/${id}.json`);
     urls.add(tileJsonUrl);
     const tileJson = await fetchJson(tileJsonUrl);
-    const template = (tileJson.tiles && tileJson.tiles[0]) || `https://api.mapbox.com/v4/${id}/{z}/{x}/{y}.vector.pbf?access_token=${mapboxgl.accessToken}`;
+    const rawTemplate = tileJson.tiles && tileJson.tiles[0];
+    if (!rawTemplate) continue;
+    const template = httpsify(rawTemplate);
     const sourceMin = Math.max(zMin, tileJson.minzoom ?? 0);
     const sourceMax = Math.min(zMax, tileJson.maxzoom ?? zMax);
+    if (sourceMin > sourceMax) continue;
     for (const { z, x, y } of enumerateTiles(bbox, sourceMin, sourceMax)) {
       urls.add(fillTileTemplate(template, z, x, y));
     }
@@ -230,24 +248,25 @@ async function buildMapboxUrls(bbox, zMin, zMax) {
   if (styleJson.sprite) {
     const spriteBase = styleJson.sprite.startsWith('mapbox://sprites/')
       ? `https://api.mapbox.com/styles/v1/${styleJson.sprite.replace('mapbox://sprites/', '')}/sprite`
-      : styleJson.sprite;
+      : httpsify(styleJson.sprite);
     for (const suffix of ['.json', '.png', '@2x.json', '@2x.png']) {
       urls.add(withToken(spriteBase + suffix));
     }
   }
 
-  // 4. Glyphs — Latin range only (cap payload).
-  const fontstacks = uniqueFontstacks(styleJson);
-  for (const stack of fontstacks) {
-    for (const [start, end] of GLYPH_RANGES) {
-      urls.add(withToken(`https://api.mapbox.com/fonts/v1/${encodeURIComponent(stack)}/${start}-${end}.pbf`));
+  // 4. Glyphs — Latin range only. Use the style's own glyphs template so the
+  // `{user}` segment (e.g. `mapbox/`) is preserved instead of dropped.
+  const glyphsTemplate = glyphsTemplateToHttps(styleJson.glyphs);
+  if (glyphsTemplate) {
+    const fontstacks = uniqueFontstacks(styleJson);
+    for (const stack of fontstacks) {
+      for (const [start, end] of GLYPH_RANGES) {
+        const filled = glyphsTemplate
+          .replace('{fontstack}', encodeURIComponent(stack))
+          .replace('{range}', `${start}-${end}`);
+        urls.add(withToken(filled));
+      }
     }
-  }
-
-  // 5. DEM tiles for click-elevation (raster-dem source maxzoom = 14)
-  const demMax = Math.min(zMax, DEM_MAXZOOM);
-  for (const { z, x, y } of enumerateTiles(bbox, zMin, demMax)) {
-    urls.add(withToken(`https://api.mapbox.com/v4/${DEM_SOURCE}/${z}/${x}/${y}.webp`));
   }
 
   return Array.from(urls);
@@ -458,7 +477,8 @@ function showDrawHint(message) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'offline-draw-hint';
-    document.body.appendChild(el);
+    const host = document.getElementById('map-container') || document.body;
+    host.appendChild(el);
   }
   el.textContent = message;
   el.hidden = false;
@@ -469,13 +489,33 @@ function hideDrawHint() {
   if (el) el.hidden = true;
 }
 
+const SAVE_BUTTON_DEFAULT = '📥 Save offline area';
+const SAVE_BUTTON_CANCEL = '✖ Cancel drawing';
+
+function setSaveButtonMode(mode) {
+  const btn = document.getElementById('offline-save-btn');
+  if (!btn) return;
+  if (mode === 'cancel') {
+    btn.textContent = SAVE_BUTTON_CANCEL;
+    btn.classList.add('offline-cancel-mode');
+  } else {
+    btn.textContent = SAVE_BUTTON_DEFAULT;
+    btn.classList.remove('offline-cancel-mode');
+  }
+}
+
+export function isDrawing() {
+  return drawState !== null;
+}
+
 let drawState = null;
 
 export function startDrawMode(map, onComplete) {
   if (drawState) cancelDrawMode(map);
   ensureDrawLayers(map);
   map.getCanvas().style.cursor = 'crosshair';
-  showDrawHint('Click to set first corner — Esc to cancel');
+  showDrawHint('Tap the map to set the first corner — tap Save again or press Esc to cancel');
+  setSaveButtonMode('cancel');
 
   const state = { firstCorner: null, onComplete };
   drawState = state;
@@ -484,7 +524,7 @@ export function startDrawMode(map, onComplete) {
     const p = { lng: e.lngLat.lng, lat: e.lngLat.lat };
     if (!state.firstCorner) {
       state.firstCorner = p;
-      showDrawHint('Click to set opposite corner — Esc to cancel');
+      showDrawHint('Tap the opposite corner — tap Save again or press Esc to cancel');
       return;
     }
     const bbox = normalizeBbox(state.firstCorner, p);
@@ -526,6 +566,7 @@ function finishDrawMode(map) {
   drawState = null;
   map.getCanvas().style.cursor = '';
   hideDrawHint();
+  setSaveButtonMode('default');
   // Keep the polygon visible briefly so the user sees confirmation; clear after 600 ms.
   setTimeout(() => clearDrawLayers(map), 600);
 }
@@ -535,6 +576,7 @@ export function cancelDrawMode(map) {
   drawState = null;
   map.getCanvas().style.cursor = '';
   hideDrawHint();
+  setSaveButtonMode('default');
   clearDrawLayers(map);
 }
 
@@ -846,6 +888,10 @@ function attachSaveButton(map) {
   const btn = document.getElementById('offline-save-btn');
   if (!btn) return;
   btn.addEventListener('click', () => {
+    if (isDrawing()) {
+      cancelDrawMode(map);
+      return;
+    }
     startDrawMode(map, async (bbox) => {
       window.dispatchEvent(new CustomEvent('offline:bbox-ready', { detail: { bbox } }));
       const choice = await openDownloadModal(bbox);

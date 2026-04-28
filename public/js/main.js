@@ -1,4 +1,4 @@
-import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData } from './map.js';
+import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData, applyOverlayVisibility } from './map.js';
 import { initSearch } from './search.js';
 import { initOfflineModule } from './offline.js';
 
@@ -174,21 +174,7 @@ function setupFullscreenMapOption(mapInstance) {
 // Initialize layers and custom logic when map style loads
 map.on('style.load', () => {
   addMapLayers(map);
-
-  // Sync checkbox state AFTER layers are created
-  const toggleTrailsBtn = document.getElementById('toggle-trails');
-  if (toggleTrailsBtn && map.getLayer('trails-lines')) {
-    const initialVis = toggleTrailsBtn.checked ? 'visible' : 'none';
-    map.setLayoutProperty('trails-lines', 'visibility', initialVis);
-  }
-
-  const toggleFerrataBtn = document.getElementById('toggle-ferrata');
-  if (toggleFerrataBtn && map.getLayer('ferrata-lines')) {
-    const initialVis = toggleFerrataBtn.checked ? 'visible' : 'none';
-    map.setLayoutProperty('ferrata-lines', 'visibility', initialVis);
-  }
-  
-  // Automatically trigger the first fetch once layers are loaded!
+  applyOverlayVisibility(map);
   fetchDynamicData(map);
 });
 

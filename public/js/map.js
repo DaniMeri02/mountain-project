@@ -471,22 +471,31 @@ export function setupStyleSwitcher(map) {
     };
   }
 
-  // Setup toggle button for trails visibility
-  const toggleTrailsBtn = document.getElementById('toggle-trails');
-  if (toggleTrailsBtn) {
-    toggleTrailsBtn.addEventListener('change', (e) => {
-      if (map.getLayer('trails-lines')) {
-        map.setLayoutProperty('trails-lines', 'visibility', e.target.checked ? 'visible' : 'none');
-      }
-    });
-  }
+  // Single source of truth for overlay visibility — keep checkbox state and
+  // layer visibility in sync regardless of when style.load fires or layers
+  // are recreated by setStyle().
+  const VISIBILITY_PAIRS = [
+    ['toggle-trails', 'trails-lines'],
+    ['toggle-ferrata', 'ferrata-lines'],
+    ['toggle-icons', 'pois-points'],
+  ];
 
-  const toggleFerrataBtn = document.getElementById('toggle-ferrata');
-  if (toggleFerrataBtn) {
-    toggleFerrataBtn.addEventListener('change', (e) => {
-      if (map.getLayer('ferrata-lines')) {
-        map.setLayoutProperty('ferrata-lines', 'visibility', e.target.checked ? 'visible' : 'none');
-      }
-    });
+  for (const [inputId] of VISIBILITY_PAIRS) {
+    const input = document.getElementById(inputId);
+    if (!input) continue;
+    input.addEventListener('change', () => applyOverlayVisibility(map));
+  }
+}
+
+export function applyOverlayVisibility(map) {
+  const pairs = [
+    ['toggle-trails', 'trails-lines'],
+    ['toggle-ferrata', 'ferrata-lines'],
+    ['toggle-icons', 'pois-points'],
+  ];
+  for (const [inputId, layerId] of pairs) {
+    const input = document.getElementById(inputId);
+    if (!input || !map.getLayer(layerId)) continue;
+    map.setLayoutProperty(layerId, 'visibility', input.checked ? 'visible' : 'none');
   }
 }

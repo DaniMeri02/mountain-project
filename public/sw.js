@@ -1,7 +1,7 @@
 // Service worker — Mountain Portal offline support.
 // Three caches: shell (precached), tiles (cache-first immutable), api (network-first).
 
-const SHELL_CACHE = 'shell-v1';
+const SHELL_CACHE = 'shell-v3';
 const TILES_CACHE = 'tiles-v1';
 const API_CACHE = 'api-v1';
 const KNOWN_CACHES = new Set([SHELL_CACHE, TILES_CACHE, API_CACHE]);
@@ -25,7 +25,9 @@ const SHELL_URLS = [
 ];
 
 const TILE_HOSTS = /^https:\/\/[abc]\.tile\.opentopomap\.org\//;
-const MAPBOX_HOSTS = /^https:\/\/api\.mapbox\.com\/(styles\/v1|fonts\/v1|v4|mapbox-gl-js)\//;
+// Mapbox serves style/sprite/glyphs/TileJSON from api.mapbox.com but tile templates
+// returned in TileJSON point at *.tiles.mapbox.com — both must be cacheable.
+const MAPBOX_HOSTS = /^https:\/\/(api\.mapbox\.com\/(styles\/v1|fonts\/v1|v4|raster\/v1|mapbox-gl-js)|[abc]\.tiles\.mapbox\.com\/)/;
 const API_PREFETCH = /\/api\/(offline\/bundle|trails|pois|ferrata)(\?|$)/;
 
 self.addEventListener('install', (event) => {
@@ -114,9 +116,13 @@ self.addEventListener('fetch', (event) => {
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
-    request.destination === 'image' ||
     request.destination === 'manifest'
   ) {
+    // Network-first so JS/CSS updates land without manual cache bumps; cached copy is fallback offline.
+    event.respondWith(networkFirst(request, SHELL_CACHE));
+    return;
+  }
+  if (request.destination === 'image') {
     event.respondWith(cacheFirst(request, SHELL_CACHE));
     return;
   }
