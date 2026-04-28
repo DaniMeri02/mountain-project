@@ -29,14 +29,19 @@ function waitForMapSettle(map, timeoutMs = 1800) {
 export async function initSearch(map) {
   const searchBox = document.getElementById('search-box');
   const searchResults = document.getElementById('search-results');
+  const searchContainer = document.getElementById('search-container');
 
-  if (!searchBox || !searchResults) {
+  if (!searchBox || !searchResults || !searchContainer) {
     return;
   }
 
-  const FULL_PLACEHOLDER = 'Search huts, peaks, bivouacs, via ferrata...';
-  const MEDIUM_PLACEHOLDER = 'Search huts, peaks, bivouacs...';
-  const SHORT_PLACEHOLDER = 'Search...';
+  const PLACEHOLDER_TIERS = [
+    { minWidth: 280, text: 'Search huts, peaks, bivouacs, via ferrata...' },
+    { minWidth: 210, text: 'Search huts, peaks, bivouacs...' },
+    { minWidth: 150, text: 'Search huts, peaks...' },
+    { minWidth: 100, text: 'Search huts...' },
+    { minWidth: 0,   text: 'Search...' }
+  ];
 
   let debounceTimer;
   let lastMatches = [];
@@ -44,18 +49,8 @@ export async function initSearch(map) {
 
   function syncSearchPlaceholder() {
     const width = searchBox.clientWidth;
-
-    if (width >= 360) {
-      searchBox.placeholder = FULL_PLACEHOLDER;
-      return;
-    }
-
-    if (width >= 250) {
-      searchBox.placeholder = MEDIUM_PLACEHOLDER;
-      return;
-    }
-
-    searchBox.placeholder = SHORT_PLACEHOLDER;
+    const tier = PLACEHOLDER_TIERS.find(t => width >= t.minWidth);
+    searchBox.placeholder = tier.text;
   }
 
   function schedulePlaceholderSync() {
@@ -193,9 +188,9 @@ export async function initSearch(map) {
     }
   });
 
-  // Hide dropdown if clicked outside
+  // Hide dropdown when clicking outside — contains() covers touch on child <strong>/<small> nodes
   document.addEventListener('click', (e) => {
-    if (e.target.id !== 'search-box') {
+    if (!searchContainer.contains(e.target)) {
       searchResults.style.display = 'none';
     }
   });

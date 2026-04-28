@@ -100,8 +100,9 @@ export function addMapLayers(map) {
 
   // Re-apply 3D Terrain if the selected mode demands it
   if (currentMode === 'satellite-3d') {
-    // Enable 3D terrain with exaggeration
-    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+    // Enable 3D terrain with exaggeration — reduce on mobile to ease GPU load
+    const exaggeration = window.innerWidth >= 768 ? 1.5 : 0.8;
+    map.setTerrain({ 'source': 'mapbox-dem', exaggeration });
 
     // Add sky layer for better atmosphere effect when tilted
     if (!map.getLayer('sky')) {
@@ -151,13 +152,15 @@ export function addMapLayers(map) {
           'hut-icon'
         ],
         'icon-size': 1,
-        'icon-allow-overlap': false, // Let Mapbox organically hide colliding icons!
+        'icon-allow-overlap': false,
         'text-allow-overlap': false,
-        'text-field': ['get', 'name'],
+        'text-optional': true,
+        'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
         'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-        'text-size': 11,
+        'text-size': ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 10, 17, 12],
         'text-anchor': 'top',
-        'text-offset': [0, 0.6]
+        'text-offset': [0, 0.6],
+        'text-padding': 20
       },
       paint: {
         'text-color': '#4a4a4a',

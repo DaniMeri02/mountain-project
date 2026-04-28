@@ -123,11 +123,11 @@ export async function updatePanel(props, coordinates) {
       </div>
       <button id="generate-ai-btn" class="ai-magic-btn">✨ Genera AI Guide</button>
 
-      <div id="ai-loading" class="ai-loading" style="display: none;">
+      <div id="ai-loading" class="ai-loading is-hidden">
         <em>Ricerca in corso su fonti web... ⏳</em>
       </div>
 
-      <div id="ai-result" class="ai-result" style="display: none;">
+      <div id="ai-result" class="ai-result is-hidden">
         <div id="ai-result-content" class="ai-result-content"></div>
         <div id="ai-meta" class="ai-meta-row"></div>
         <button id="regenerate-ai-btn" class="ai-regenerate-btn" style="display: none;">
@@ -136,6 +136,8 @@ export async function updatePanel(props, coordinates) {
       </div>
     </div>
   `;
+
+  window.dispatchEvent(new Event('panel:updated'));
 
   // Build the payload once — reused for both generate and regenerate
   const aiPayload = {

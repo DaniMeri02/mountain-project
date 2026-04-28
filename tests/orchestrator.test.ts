@@ -30,7 +30,7 @@ vi.mock('fs', async () => {
 let mockCacheInstance: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn>; invalidate: ReturnType<typeof vi.fn> };
 vi.mock('../agent/cache', () => ({
   buildCacheKey: vi.fn(() => 'test-cache-key'),
-  AiDescriptionCache: vi.fn().mockImplementation(() => mockCacheInstance),
+  AiDescriptionCache: vi.fn().mockImplementation(function () { return mockCacheInstance; }),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
