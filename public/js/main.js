@@ -1,5 +1,6 @@
 import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData } from './map.js';
 import { initSearch } from './search.js';
+import { initOfflineModule } from './offline.js';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZGFuaW1lcmkiLCJhIjoiY21uZzFhaWdpMDIyajJyczY4YWFudzJ2ZyJ9.CbG1-cZKowq0cF8qCw2RDw';
 
@@ -7,15 +8,49 @@ if (typeof mapboxgl.setTelemetryEnabled === 'function') {
   mapboxgl.setTelemetryEnabled(false);
 }
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('SW registration failed', err);
+    });
+  });
+}
+
+// Rewrite mapbox:// URIs to real HTTPS so the service worker can cache them.
+function mapboxTransformRequest(url) {
+  if (url.startsWith('mapbox://styles/')) {
+    return { url: url.replace('mapbox://styles/', 'https://api.mapbox.com/styles/v1/') + '?access_token=' + mapboxgl.accessToken };
+  }
+  if (url.startsWith('mapbox://sprites/')) {
+    return { url: url.replace('mapbox://sprites/', 'https://api.mapbox.com/styles/v1/') + '/sprite?access_token=' + mapboxgl.accessToken };
+  }
+  if (url.startsWith('mapbox://fonts/')) {
+    return { url: url.replace('mapbox://fonts/', 'https://api.mapbox.com/fonts/v1/') + '?access_token=' + mapboxgl.accessToken };
+  }
+  if (url.startsWith('mapbox://')) {
+    return { url: 'https://api.mapbox.com/v4/' + url.slice(9) + '?access_token=' + mapboxgl.accessToken };
+  }
+  return { url };
+}
+
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/outdoors-v12',
-  center: [9.64, 46.26], // Centered around Val Masino / Disgrazia to view the downloaded paths!
+  center: [9.64, 46.26],
   zoom: 12,
-  performanceMetricsCollection: false
+  performanceMetricsCollection: false,
+  transformRequest: mapboxTransformRequest
 });
 
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+const geolocate = new mapboxgl.GeolocateControl({
+  positionOptions: { enableHighAccuracy: true },
+  trackUserLocation: true,
+  showUserHeading: true
+});
+map.addControl(geolocate, 'bottom-right');
+window.__geolocateControl = geolocate;
 
 function setupFullscreenMapOption(mapInstance) {
   const toggleBtn = document.getElementById('toggle-map-fullscreen');
@@ -168,6 +203,9 @@ setupFullscreenMapOption(map);
 
 // Initialize search bar functionality
 initSearch(map);
+
+// Initialize offline-area downloader and saved-area registry
+initOfflineModule(map);
 
 // Resize map when panel content changes (e.g. POI selected, AI description loaded)
 window.addEventListener('panel:updated', () => {
