@@ -113,23 +113,24 @@ function getFeatureCoordinates(feature, fallbackLngLat) {
   return null;
 }
 
-function removeTransientClickMarker() {
+export function removeTransientClickMarker() {
   if (transientClickMarker) {
     transientClickMarker.remove();
     transientClickMarker = null;
   }
 }
 
-function upsertTransientClickMarker(map, coordinates) {
+function upsertTransientClickMarker(map, coordinates, className = 'map-click-ping') {
   if (!coordinates) return;
 
-  if (!transientClickMarker) {
+  if (!transientClickMarker || transientClickMarker.getElement().className !== className) {
+    removeTransientClickMarker();
     const markerElement = document.createElement('div');
-    markerElement.className = 'map-click-ping';
+    markerElement.className = className;
 
     transientClickMarker = new mapboxgl.Marker({
       element: markerElement,
-      anchor: 'bottom'
+      anchor: className === 'map-draw-pin' ? 'center' : 'bottom'
     })
       .setLngLat([coordinates.lng, coordinates.lat])
       .addTo(map);
@@ -448,6 +449,14 @@ export function setupMapInteractivity(map) {
     if (poiAtPoint.length > 0) return;
 
     const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+
+    // In draw mode show a neutral crosshair pin instead of the purple ping;
+    // skip panel update since the click is for bbox selection, not POI lookup.
+    if (window.__drawMode) {
+      upsertTransientClickMarker(map, coordinates, 'map-draw-pin');
+      return;
+    }
+
     const panelToken = ++latestPanelUpdateToken;
 
     upsertTransientClickMarker(map, coordinates);

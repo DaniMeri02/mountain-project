@@ -453,6 +453,22 @@ body.map-fullscreen #panel {
   border-top: 11px solid #CC00FF;
 }
 
+.map-draw-pin {
+  width: 20px;
+  height: 20px;
+  position: relative;
+  pointer-events: none;
+}
+.map-draw-pin::before,
+.map-draw-pin::after {
+  content: '';
+  position: absolute;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 1px;
+}
+.map-draw-pin::before { width: 2px; height: 20px; left: 9px; top: 0; }
+.map-draw-pin::after  { width: 20px; height: 2px; left: 0; top: 9px; }
+
 /* POI panel badge system */
 .badge {
   display: inline-block;

@@ -1,7 +1,7 @@
 // Offline area downloader + saved-area registry.
 // Self-contained module: IndexedDB layer, draw mode, downloader, list UI, open-offline flow.
 
-import { buildTopoStyle, buildOsmStyle, setBasemapMode, getBasemapMode, addMapLayers, applyOverlayVisibility } from './map.js';
+import { buildTopoStyle, buildOsmStyle, setBasemapMode, getBasemapMode, addMapLayers, applyOverlayVisibility, removeTransientClickMarker } from './map.js';
 import { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from './tile-math.js';
 export { tilesInBboxAtZoom, tileCountForRange, enumerateTiles };
 
@@ -556,6 +556,7 @@ let drawState = null;
 
 export function startDrawMode(map, onComplete) {
   if (drawState) cancelDrawMode(map);
+  window.__drawMode = true;
   ensureDrawLayers(map);
   map.getCanvas().style.cursor = 'crosshair';
   showDrawHint('Tap the map to set the first corner — tap Save again or press Esc to cancel');
@@ -574,7 +575,8 @@ export function startDrawMode(map, onComplete) {
     const bbox = normalizeBbox(state.firstCorner, p);
     const onDone = state.onComplete;
     finishDrawMode(map);
-    if (onDone) onDone(bbox);
+    // Let the user see the selected area for 1s before the modal appears.
+    setTimeout(() => { if (onDone) onDone(bbox); }, 1000);
   };
 
   const handleMove = (e) => {
@@ -608,16 +610,20 @@ function detachDrawHandlers(map) {
 function finishDrawMode(map) {
   detachDrawHandlers(map);
   drawState = null;
+  window.__drawMode = false;
+  removeTransientClickMarker();
   map.getCanvas().style.cursor = '';
   hideDrawHint();
   setSaveButtonMode('default');
-  // Keep the polygon visible briefly so the user sees confirmation; clear after 600 ms.
-  setTimeout(() => clearDrawLayers(map), 600);
+  // Keep the polygon visible until after the modal delay (1s); clear at 1.1s.
+  setTimeout(() => clearDrawLayers(map), 1100);
 }
 
 export function cancelDrawMode(map) {
   detachDrawHandlers(map);
   drawState = null;
+  window.__drawMode = false;
+  removeTransientClickMarker();
   map.getCanvas().style.cursor = '';
   hideDrawHint();
   setSaveButtonMode('default');
