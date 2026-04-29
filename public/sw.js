@@ -24,7 +24,7 @@ const SHELL_URLS = [
   'https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css',
 ];
 
-const TILE_HOSTS = /^https:\/\/[abc]\.tile\.opentopomap\.org\//;
+const TILE_HOSTS = /^https:\/\/[abc]\.tile\.(opentopomap|openstreetmap)\.org\//;
 // Mapbox serves style/sprite/glyphs/TileJSON from api.mapbox.com but tile templates
 // returned in TileJSON point at *.tiles.mapbox.com — both must be cacheable.
 const MAPBOX_HOSTS = /^https:\/\/(api\.mapbox\.com\/(styles\/v1|fonts\/v1|v4|raster\/v1|mapbox-gl-js)|[abc]\.tiles\.mapbox\.com\/)/;
@@ -63,13 +63,16 @@ function isApiPrefetch(url) {
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request.url);
   if (cached) return cached;
 
   try {
-    const response = await fetch(request);
+    const req = /tile\.(openstreetmap)\.org/.test(request.url)
+      ? new Request(request, { referrerPolicy: 'origin' })
+      : request;
+    const response = await fetch(req);
     if (response.ok || response.type === 'opaque') {
-      cache.put(request, response.clone()).catch(() => {});
+      cache.put(request.url, response.clone()).catch(() => {});
     }
     return response;
   } catch (err) {

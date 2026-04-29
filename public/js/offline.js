@@ -1,7 +1,7 @@
 // Offline area downloader + saved-area registry.
 // Self-contained module: IndexedDB layer, draw mode, downloader, list UI, open-offline flow.
 
-import { buildTopoStyle, setBasemapMode } from './map.js';
+import { buildTopoStyle, buildOsmStyle, setBasemapMode, getBasemapMode, addMapLayers, applyOverlayVisibility } from './map.js';
 import { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from './tile-math.js';
 export { tilesInBboxAtZoom, tileCountForRange, enumerateTiles };
 
@@ -141,7 +141,7 @@ async function throttledFetchAll(urls, concurrency, minIntervalMs, onProgress) {
 
       const url = urls[idx];
       try {
-        const res = await fetch(url, { mode: 'cors' });
+        const res = await fetch(url, { mode: 'cors', referrerPolicy: 'origin' });
         if (!res.ok && res.status !== 0) failures.push({ url, status: res.status });
       } catch (err) {
         failures.push({ url, error: err && err.message ? err.message : String(err) });
@@ -161,6 +161,22 @@ function buildOpentopoUrls(bbox, zMin, zMax) {
   let i = 0;
   for (const { z, x, y } of enumerateTiles(bbox, zMin, zMax)) {
     urls.push(opentopoUrl(z, x, y, i++));
+  }
+  return urls;
+}
+
+const OSM_SUBDOMAINS = ['a', 'b', 'c'];
+
+function osmUrl(z, x, y, idx) {
+  const sub = OSM_SUBDOMAINS[idx % OSM_SUBDOMAINS.length];
+  return `https://${sub}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+}
+
+function buildOsmUrls(bbox, zMin, zMax) {
+  const urls = [];
+  let i = 0;
+  for (const { z, x, y } of enumerateTiles(bbox, zMin, zMax)) {
+    urls.push(osmUrl(z, x, y, i++));
   }
   return urls;
 }
@@ -293,6 +309,15 @@ function ensureProgressUI() {
 
 function showProgress() {
   const host = ensureProgressUI();
+  const card = host.querySelector('.offline-progress-card');
+  if (card) {
+    card.classList.remove('offline-success');
+    card.innerHTML = `
+      <div class="offline-progress-label">Downloading tiles…</div>
+      <div class="offline-progress-bar"><div class="offline-progress-fill"></div></div>
+      <div class="offline-progress-count">0 / 0</div>
+    `;
+  }
   host.hidden = false;
   setProgress(0, 0);
 }
@@ -300,6 +325,24 @@ function showProgress() {
 function hideProgress() {
   const host = document.getElementById('offline-progress');
   if (host) host.hidden = true;
+}
+
+function showSuccess(area) {
+  const host = ensureProgressUI();
+  const card = host.querySelector('.offline-progress-card');
+  if (!card) return;
+  const sizeMb = (area.sizeBytes / 1024 / 1024).toFixed(1);
+  card.classList.add('offline-success');
+  card.innerHTML = `
+    <div class="offline-success-icon">✓</div>
+    <div class="offline-success-title">Area saved!</div>
+    <div class="offline-success-meta">${area.name} · ${sizeMb} MB · ${area.tileCount} tiles</div>
+    <button class="offline-btn offline-success-close" type="button">Close</button>
+  `;
+  host.hidden = false;
+  card.querySelector('.offline-success-close').addEventListener('click', () => {
+    host.hidden = true;
+  });
 }
 
 function setProgress(done, total) {
@@ -353,6 +396,8 @@ export async function downloadArea(bbox, options = {}) {
   let tileUrls = [];
   if (basemap === 'opentopo') {
     tileUrls = buildOpentopoUrls(bbox, minZoom, maxZoom);
+  } else if (basemap === 'osm') {
+    tileUrls = buildOsmUrls(bbox, minZoom, maxZoom);
   } else if (basemap === 'mapbox') {
     tileUrls = await buildMapboxUrls(bbox, minZoom, maxZoom);
   } else {
@@ -362,15 +407,14 @@ export async function downloadArea(bbox, options = {}) {
   // 3. Prefetch tiles through SW (cache-first), throttled to respect tile-server policies
   showProgress();
   setProgress(0, tileUrls.length);
-  const concurrency = basemap === 'opentopo' ? 2 : 6;
-  const minInterval = basemap === 'opentopo' ? 400 : 0; // ~2.5 req/s for OpenTopo
+  const concurrency = basemap === 'mapbox' ? 6 : 2;
+  const minInterval = basemap === 'mapbox' ? 0 : 400; // ~2.5 req/s for raster tile servers
   const { failures } = await throttledFetchAll(
     tileUrls,
     concurrency,
     minInterval,
     (done, total) => setProgress(done, total)
   );
-  hideProgress();
 
   const failureRate = tileUrls.length > 0 ? failures.length / tileUrls.length : 0;
   if (failureRate > 0.05) {
@@ -385,8 +429,8 @@ export async function downloadArea(bbox, options = {}) {
   await putOverlays(id, overlays);
   await incrTileRefs(tileUrls);
 
-  // Approximate tile bytes (OpenTopo PNGs hover ~25 KB, Mapbox vector ~40 KB).
-  const avgTileSize = basemap === 'opentopo' ? 25000 : 40000;
+  // Approximate tile bytes: OpenTopo ~25 KB, OSM ~18 KB, Mapbox vector ~40 KB.
+  const avgTileSize = basemap === 'mapbox' ? 40000 : basemap === 'osm' ? 18000 : 25000;
   const sizeBytes = overlaysSize + tileUrls.length * avgTileSize;
 
   const area = {
@@ -582,8 +626,8 @@ export function cancelDrawMode(map) {
 
 // ── Download modal ───────────────────────────────────────────────────────────
 
-const TILE_SIZE_BYTES = { opentopo: 25000, mapbox: 40000 };
-const FIXED_OVERHEAD_BYTES = { opentopo: 200000, mapbox: 6 * 1024 * 1024 + 200000 };
+const TILE_SIZE_BYTES = { opentopo: 25000, osm: 18000, mapbox: 40000 };
+const FIXED_OVERHEAD_BYTES = { opentopo: 200000, osm: 200000, mapbox: 6 * 1024 * 1024 + 200000 };
 
 function formatMB(bytes) {
   return (bytes / 1024 / 1024).toFixed(1);
@@ -621,9 +665,9 @@ function openDownloadModal(bbox) {
           <label class="offline-field">
             <span>Zoom range</span>
             <span class="offline-zoom-inputs">
-              <input type="number" name="zMin" min="8" max="18" required>
+              <select name="zMin">${Array.from({length:12},(_,i)=>`<option value="${i+8}">${i+8}</option>`).join('')}</select>
               –
-              <input type="number" name="zMax" min="8" max="18" required>
+              <select name="zMax">${Array.from({length:12},(_,i)=>`<option value="${i+8}">${i+8}</option>`).join('')}</select>
             </span>
           </label>
 
@@ -638,11 +682,19 @@ function openDownloadModal(bbox) {
               </span>
             </label>
             <label class="offline-radio">
+              <input type="radio" name="basemap" value="osm">
+              <span class="offline-radio-body">
+                <strong>OpenStreetMap</strong>
+                <small class="offline-radio-est"></small>
+                <small>Standard OSM raster tiles. Personal use only.</small>
+              </span>
+            </label>
+            <label class="offline-radio">
               <input type="radio" name="basemap" value="mapbox">
               <span class="offline-radio-body">
                 <strong>Mapbox Outdoors</strong>
                 <small class="offline-radio-est"></small>
-                <small class="offline-radio-warning">⚠ Mapbox SDK ToS does not officially permit offline persistence — tolerated for personal local use.</small>
+                <small>Detailed vector style, labels, hillshade.</small>
               </span>
             </label>
           </fieldset>
@@ -657,13 +709,30 @@ function openDownloadModal(bbox) {
 
     const form = host.querySelector('form');
     const nameInput = form.querySelector('input[name="name"]');
-    const zMinInput = form.querySelector('input[name="zMin"]');
-    const zMaxInput = form.querySelector('input[name="zMax"]');
+    const zMinInput = form.querySelector('select[name="zMin"]');
+    const zMaxInput = form.querySelector('select[name="zMax"]');
     const radioEsts = form.querySelectorAll('.offline-radio-est');
+
+    const BASEMAP_MAX_ZOOM = { opentopo: 17, osm: 19, mapbox: 16 };
+
+    function applyBasemapZoom(basemap) {
+      const max = BASEMAP_MAX_ZOOM[basemap] ?? 17;
+      zMaxInput.value = String(max);
+      Array.from(zMaxInput.options).forEach((opt) => {
+        opt.disabled = Number(opt.value) > max;
+      });
+      Array.from(zMinInput.options).forEach((opt) => {
+        opt.disabled = Number(opt.value) > max;
+      });
+      refreshEstimates();
+    }
 
     nameInput.value = defaultName;
     zMinInput.value = '12';
-    zMaxInput.value = '16';
+
+    form.querySelectorAll('input[name="basemap"]').forEach((radio) => {
+      radio.addEventListener('change', () => applyBasemapZoom(radio.value));
+    });
 
     function refreshEstimates() {
       const zMin = Number(zMinInput.value);
@@ -674,13 +743,17 @@ function openDownloadModal(bbox) {
       }
       const tiles = tileCountForRange(bbox, zMin, zMax);
       const opentopoSize = tiles * TILE_SIZE_BYTES.opentopo + FIXED_OVERHEAD_BYTES.opentopo;
+      const osmSize = tiles * TILE_SIZE_BYTES.osm + FIXED_OVERHEAD_BYTES.osm;
       const mapboxSize = tiles * TILE_SIZE_BYTES.mapbox + FIXED_OVERHEAD_BYTES.mapbox;
       radioEsts[0].textContent = `~${tiles} tiles · ~${formatMB(opentopoSize)} MB`;
-      radioEsts[1].textContent = `~${tiles} tiles + style/glyphs/DEM · ~${formatMB(mapboxSize)} MB`;
+      radioEsts[1].textContent = `~${tiles} tiles · ~${formatMB(osmSize)} MB`;
+      radioEsts[2].textContent = `~${tiles} tiles + style/glyphs/DEM · ~${formatMB(mapboxSize)} MB`;
     }
-    refreshEstimates();
-    zMinInput.addEventListener('input', refreshEstimates);
-    zMaxInput.addEventListener('input', refreshEstimates);
+    // Set zMax to basemap max for whichever radio is initially checked
+    const checkedBasemap = form.querySelector('input[name="basemap"]:checked')?.value ?? 'opentopo';
+    applyBasemapZoom(checkedBasemap);
+    zMinInput.addEventListener('change', refreshEstimates);
+    zMaxInput.addEventListener('change', refreshEstimates);
 
     form.querySelector('.offline-cancel').addEventListener('click', () => {
       closeModal();
@@ -732,8 +805,8 @@ function ensureExitButton() {
   btn.className = 'offline-btn';
   btn.textContent = '🚪 Exit offline';
   btn.hidden = true;
-  const topControls = document.getElementById('top-controls');
-  if (topControls) topControls.appendChild(btn);
+  const container = document.getElementById('offline-controls') || document.getElementById('top-controls');
+  if (container) container.appendChild(btn);
   return btn;
 }
 
@@ -749,19 +822,11 @@ export async function openArea(map, areaId) {
   window.__offlineMode = true;
   setOfflineLockedUI(true);
 
-  // Switch basemap to the saved area's basemap.
-  if (area.basemap === 'opentopo') {
-    setBasemapMode('opentopo');
-    map.setStyle(buildTopoStyle());
-    syncOpentopoRadio();
-  } else {
-    setBasemapMode('outdoors-v12');
-    map.setStyle('mapbox://styles/mapbox/outdoors-v12');
-    syncRadio('outdoors-v12');
-  }
-
   const onStyleLoad = () => {
+    addMapLayers(map);
+    applyOverlayVisibility(map);
     applyOverlays(map, overlays);
+    addBboxMask(map, area.bbox);
     const [w, s, e, n] = area.bbox;
     map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 600 });
     if (window.__geolocateControl && navigator.permissions) {
@@ -772,7 +837,34 @@ export async function openArea(map, areaId) {
       }).catch(() => {});
     }
   };
-  map.once('style.load', onStyleLoad);
+
+  // Determine whether a style change is needed.
+  // For Mapbox outdoors: skip setStyle if already active — Mapbox GL JS v3 does
+  // not re-fire 'style.load' for same-URL calls AND does async source cleanup
+  // that would remove our layers. Call onStyleLoad directly instead.
+  const needsMapboxSwitch = area.basemap === 'mapbox' && getBasemapMode() !== 'outdoors-v12';
+
+  if (area.basemap === 'opentopo') {
+    setBasemapMode('opentopo');
+    map.once('style.load', onStyleLoad);
+    map.setStyle(buildTopoStyle());
+    syncOpentopoRadio();
+  } else if (area.basemap === 'osm') {
+    setBasemapMode('opentopo');
+    map.once('style.load', onStyleLoad);
+    map.setStyle(buildOsmStyle());
+    syncOpentopoRadio();
+  } else if (needsMapboxSwitch) {
+    setBasemapMode('outdoors-v12');
+    map.once('style.load', onStyleLoad);
+    map.setStyle('mapbox://styles/mapbox/outdoors-v12');
+    syncRadio('outdoors-v12');
+  } else {
+    // Style already correct — call directly without triggering a reload.
+    setBasemapMode('outdoors-v12');
+    syncRadio('outdoors-v12');
+    onStyleLoad();
+  }
 
   const exit = ensureExitButton();
   exit.hidden = false;
@@ -788,9 +880,43 @@ function syncOpentopoRadio() {
   syncRadio('opentopo');
 }
 
+function addBboxMask(map, bbox) {
+  const [w, s, e, n] = bbox;
+  const data = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]],
+        [[w, s], [w, n], [e, n], [e, s], [w, s]],
+      ],
+    },
+  };
+  if (!map.getSource('offline-mask-src')) {
+    map.addSource('offline-mask-src', { type: 'geojson', data });
+  } else {
+    map.getSource('offline-mask-src').setData(data);
+  }
+  if (!map.getLayer('offline-bbox-mask')) {
+    const firstOverlay = ['mountain-trails', 'mountain-pois', 'mountain-ferrata']
+      .find((id) => map.getLayer(id));
+    map.addLayer(
+      { id: 'offline-bbox-mask', type: 'fill', source: 'offline-mask-src',
+        paint: { 'fill-color': '#000', 'fill-opacity': 0.38 } },
+      firstOverlay
+    );
+  }
+}
+
+function removeBboxMask(map) {
+  if (map.getLayer('offline-bbox-mask')) map.removeLayer('offline-bbox-mask');
+  if (map.getSource('offline-mask-src')) map.removeSource('offline-mask-src');
+}
+
 export function exitOfflineArea(map) {
   window.__offlineMode = false;
   setOfflineLockedUI(false);
+  removeBboxMask(map);
   setBasemapMode('outdoors-v12');
   map.setStyle('mapbox://styles/mapbox/outdoors-v12');
   syncRadio('outdoors-v12');
@@ -816,7 +942,10 @@ function injectControls() {
   const panel = document.createElement('aside');
   panel.id = 'offline-panel';
   panel.hidden = true;
-  panel.innerHTML = `<ul id="offline-areas-list"></ul>`;
+  panel.innerHTML = `
+    <div class="offline-panel-header">Saved Areas</div>
+    <ul id="offline-areas-list"></ul>
+  `;
   topControls.appendChild(panel);
 }
 
@@ -874,7 +1003,7 @@ async function renderAreasList() {
     li.innerHTML = `
       <div class="offline-row-info">
         <strong></strong>
-        <small>${area.basemap === 'opentopo' ? 'OpenTopo' : 'Mapbox'} · ${sizeMb} MB · ${created}</small>
+        <small>${area.basemap === 'opentopo' ? 'OpenTopo' : area.basemap === 'osm' ? 'OSM' : 'Mapbox'} · ${sizeMb} MB · ${created}</small>
       </div>
       <button class="offline-open" type="button" data-id="${area.id}">📂</button>
       <button class="offline-delete" type="button" data-id="${area.id}">🗑</button>
@@ -899,7 +1028,7 @@ function attachSaveButton(map) {
       try {
         const area = await downloadArea(bbox, choice);
         await renderAreasList();
-        console.info('Saved area:', area);
+        showSuccess(area);
       } catch (err) {
         hideProgress();
         console.error('Failed to save area', err);

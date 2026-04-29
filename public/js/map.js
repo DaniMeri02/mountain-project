@@ -13,6 +13,25 @@ export function setBasemapMode(mode) {
   currentMode = mode;
 }
 
+export function buildOsmStyle() {
+  return {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: [
+          'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        ],
+        tileSize: 256,
+        attribution: '© OpenStreetMap contributors',
+      },
+    },
+    layers: [{ id: 'osm-raster', type: 'raster', source: 'osm' }],
+  };
+}
+
 export function buildTopoStyle() {
   return {
     version: 8,

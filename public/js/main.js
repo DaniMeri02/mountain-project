@@ -30,6 +30,9 @@ function mapboxTransformRequest(url) {
   if (url.startsWith('mapbox://')) {
     return { url: 'https://api.mapbox.com/v4/' + url.slice(9) + '?access_token=' + mapboxgl.accessToken };
   }
+  if (url.includes('tile.openstreetmap.org')) {
+    return { url, referrerPolicy: 'origin' };
+  }
   return { url };
 }
 
@@ -42,6 +45,7 @@ const map = new mapboxgl.Map({
   transformRequest: mapboxTransformRequest
 });
 
+window.__map = map;
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
 const geolocate = new mapboxgl.GeolocateControl({
