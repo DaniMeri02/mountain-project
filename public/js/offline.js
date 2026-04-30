@@ -724,13 +724,23 @@ function openDownloadModal(bbox) {
 
     function applyBasemapZoom(basemap) {
       const max = BASEMAP_MAX_ZOOM[basemap] ?? 17;
-      zMaxInput.value = String(max);
+
       Array.from(zMaxInput.options).forEach((opt) => {
         opt.disabled = Number(opt.value) > max;
       });
       Array.from(zMinInput.options).forEach((opt) => {
         opt.disabled = Number(opt.value) > max;
       });
+
+      zMaxInput.value = String(max);
+
+      const currentMin = Number(zMinInput.value);
+      if (!Number.isFinite(currentMin)) {
+        zMinInput.value = String(Math.min(12, max));
+      } else if (currentMin > max) {
+        zMinInput.value = String(max);
+      }
+
       refreshEstimates();
     }
 
@@ -743,18 +753,31 @@ function openDownloadModal(bbox) {
 
     function refreshEstimates() {
       const zMin = Number(zMinInput.value);
-      const zMax = Number(zMaxInput.value);
-      if (!Number.isFinite(zMin) || !Number.isFinite(zMax) || zMin > zMax) {
+      if (!Number.isFinite(zMin)) {
         radioEsts.forEach((el) => { el.textContent = '—'; });
         return;
       }
-      const tiles = tileCountForRange(bbox, zMin, zMax);
-      const opentopoSize = tiles * TILE_SIZE_BYTES.opentopo + FIXED_OVERHEAD_BYTES.opentopo;
-      const osmSize = tiles * TILE_SIZE_BYTES.osm + FIXED_OVERHEAD_BYTES.osm;
-      const mapboxSize = tiles * TILE_SIZE_BYTES.mapbox + FIXED_OVERHEAD_BYTES.mapbox;
-      radioEsts[0].textContent = `~${tiles} tiles · ~${formatMB(opentopoSize)} MB`;
-      radioEsts[1].textContent = `~${tiles} tiles · ~${formatMB(osmSize)} MB`;
-      radioEsts[2].textContent = `~${tiles} tiles + style/glyphs/DEM · ~${formatMB(mapboxSize)} MB`;
+
+      const ranges = [
+        { basemap: 'opentopo', max: BASEMAP_MAX_ZOOM.opentopo ?? zMin },
+        { basemap: 'osm', max: BASEMAP_MAX_ZOOM.osm ?? zMin },
+        { basemap: 'mapbox', max: BASEMAP_MAX_ZOOM.mapbox ?? zMin },
+      ];
+
+      ranges.forEach((range, index) => {
+        if (!Number.isFinite(range.max) || zMin > range.max) {
+          radioEsts[index].textContent = '—';
+          return;
+        }
+
+        const tiles = tileCountForRange(bbox, zMin, range.max);
+        const sizeBytes = tiles * TILE_SIZE_BYTES[range.basemap] + FIXED_OVERHEAD_BYTES[range.basemap];
+        if (range.basemap === 'mapbox') {
+          radioEsts[index].textContent = `~${tiles} tiles + style/glyphs/DEM · ~${formatMB(sizeBytes)} MB`;
+        } else {
+          radioEsts[index].textContent = `~${tiles} tiles · ~${formatMB(sizeBytes)} MB`;
+        }
+      });
     }
     // Set zMax to basemap max for whichever radio is initially checked
     const checkedBasemap = form.querySelector('input[name="basemap"]:checked')?.value ?? 'opentopo';
