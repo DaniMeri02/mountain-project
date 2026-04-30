@@ -3,6 +3,7 @@
 
 import { buildTopoStyle, buildOsmStyle, setBasemapMode, getBasemapMode, addMapLayers, applyOverlayVisibility, removeTransientClickMarker } from './map.js';
 import { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from './tile-math.js';
+import { closeNav } from './nav.js';
 export { tilesInBboxAtZoom, tileCountForRange, enumerateTiles };
 
 const DB_NAME = 'mountain-offline';
@@ -811,7 +812,7 @@ function ensureExitButton() {
   btn.className = 'offline-btn';
   btn.textContent = '🚪 Exit offline';
   btn.hidden = true;
-  const container = document.getElementById('offline-controls') || document.getElementById('top-controls');
+  const container = document.getElementById('offline-controls') || document.getElementById('drawer-section-offline');
   if (container) container.appendChild(btn);
   return btn;
 }
@@ -933,17 +934,17 @@ export function exitOfflineArea(map) {
 // ── UI scaffolding ───────────────────────────────────────────────────────────
 
 function injectControls() {
-  const topControls = document.getElementById('top-controls');
-  if (!topControls || document.getElementById('offline-controls')) return;
+  const target = document.getElementById('drawer-section-offline');
+  if (!target || document.getElementById('offline-controls')) return;
 
   const block = document.createElement('div');
   block.id = 'offline-controls';
-  block.className = 'menu';
+  block.className = 'offline-controls';
   block.innerHTML = `
     <button id="offline-save-btn" type="button" class="offline-btn">📥 Save offline area</button>
     <button id="offline-list-toggle" type="button" class="offline-btn" aria-expanded="false">📂 Saved areas</button>
   `;
-  topControls.appendChild(block);
+  target.appendChild(block);
 
   const panel = document.createElement('aside');
   panel.id = 'offline-panel';
@@ -952,7 +953,7 @@ function injectControls() {
     <div class="offline-panel-header">Saved Areas</div>
     <ul id="offline-areas-list"></ul>
   `;
-  topControls.appendChild(panel);
+  target.appendChild(panel);
 }
 
 function attachListToggle(map) {
@@ -1027,6 +1028,7 @@ function attachSaveButton(map) {
       cancelDrawMode(map);
       return;
     }
+    closeNav();
     startDrawMode(map, async (bbox) => {
       window.dispatchEvent(new CustomEvent('offline:bbox-ready', { detail: { bbox } }));
       const choice = await openDownloadModal(bbox);
