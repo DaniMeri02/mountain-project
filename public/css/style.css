@@ -156,6 +156,7 @@
 .nav-backdrop {
   position: fixed; inset: 0;
   background: rgba(31, 41, 51, 0.35);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   z-index: 55;
   opacity: 0;
@@ -240,21 +241,49 @@ main {
   color: #fff;
 }
 
-/* Content panel as a separate box on the right */
+/* Content panel — mobile: bottom sheet; desktop: static side column */
 #panel {
-  height: 100%;
-  padding: 2.5rem;
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  box-sizing: border-box; /* Match sizing model with the map */
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -8px 28px rgba(31, 41, 51, 0.18);
+  /* Mobile-first: bottom sheet */
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-height: 75dvh;
+  height: auto;
+  border-radius: 16px 16px 0 0;
+  padding: calc(var(--safe-bottom) + 8px) 16px 16px;
+  transform: translateY(100%);
+  transition: transform var(--transition);
+  z-index: 65;
   overflow-y: auto;
-  opacity: 1;
-  transform: translateX(0);
-  will-change: opacity, transform;
-  transition: opacity 220ms ease, transform 260ms ease, padding 260ms ease, border-radius 260ms ease;
-  display: none;
+  pointer-events: none;
 }
+body.panel-open #panel {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#panel::before {
+  content: "";
+  display: block;
+  width: 40px; height: 4px;
+  background: rgba(31, 41, 51, 0.18);
+  border-radius: 999px;
+  margin: 6px auto 12px;
+}
+#panel-close {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 32px; height: 32px;
+  border: none; background: transparent;
+  font-size: 1.4rem; line-height: 1;
+  color: var(--color-ink-soft);
+  cursor: pointer; border-radius: var(--radius);
+  z-index: 1;
+}
+#panel-close:hover { background: rgba(31, 41, 51, 0.06); color: var(--color-ink); }
 
 /* Fullscreen map mode: keep controls/search and map, hide panel/header for focus. */
 body.map-fullscreen {
@@ -757,7 +786,22 @@ body.offline-mode #search-container input:focus {
   :root { --nav-height: 60px; }
   #search-container { max-width: 420px; margin-left: 8px; }
   main { grid-template-columns: 1fr min(420px, 32vw); }
-  #panel { display: block; }
+  #panel {
+    position: relative;
+    transform: none;
+    pointer-events: auto;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+    box-shadow: none;
+    padding: 16px;
+    z-index: auto;
+    overflow-y: auto;
+  }
+  #panel::before { display: none; }
+  #panel-close { display: none; }
   .offline-btn {
     flex: 1 1 calc(50% - 6px);
     min-height: 30px;

@@ -1,3 +1,18 @@
+function openPanel() {
+  document.body.classList.add('panel-open');
+}
+
+export function closePanel() {
+  document.body.classList.remove('panel-open');
+  const panel = document.getElementById('panel');
+  if (panel) panel.innerHTML = '';
+}
+
+function attachPanelClose() {
+  const closeBtn = document.getElementById('panel-close');
+  if (closeBtn) closeBtn.addEventListener('click', closePanel);
+}
+
 function formatElevationLabel(elevation) {
   const numericElevation = Number(elevation);
   if (Number.isFinite(numericElevation) && numericElevation > 0) {
@@ -100,6 +115,7 @@ export async function updatePanel(props, coordinates) {
     : '';
 
   panel.innerHTML = `
+    <button id="panel-close" aria-label="Close details">×</button>
     <h2>${escapeHtml(props.name)}</h2>
     <div class="panel-badges">
       <span class="badge badge-type">${typeCapitalized}</span>
@@ -230,6 +246,9 @@ export async function updatePanel(props, coordinates) {
   if (regenerateBtn) {
     regenerateBtn.addEventListener('click', () => runAiRequest(true));
   }
+
+  attachPanelClose();
+  openPanel();
 }
 
 export function updateCoordinatesPanel(lng, lat, elevation, isLoading = false) {
@@ -239,6 +258,7 @@ export function updateCoordinatesPanel(lng, lat, elevation, isLoading = false) {
   const altitudeText = renderAltitudeText(elevation, isLoading);
 
   panel.innerHTML = `
+    <button id="panel-close" aria-label="Close details">×</button>
     <h2>Clicked Coordinates</h2>
     <div class="panel-badges">
       <span class="badge badge-type">Map Click</span>
@@ -248,4 +268,7 @@ export function updateCoordinatesPanel(lng, lat, elevation, isLoading = false) {
     <p class="panel-info-line"><strong>Longitude:</strong> ${lngFixed}</p>
     <p class="panel-info-secondary">Decimal format: ${latFixed}, ${lngFixed}</p>
   `;
+
+  attachPanelClose();
+  openPanel();
 }

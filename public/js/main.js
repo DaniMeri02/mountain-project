@@ -1,6 +1,13 @@
 import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData, applyOverlayVisibility } from './map.js';
 import { initSearch } from './search.js';
 import { initOfflineModule } from './offline.js';
+import { closePanel } from './ui.js';
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('panel-open')) {
+    closePanel();
+  }
+});
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZGFuaW1lcmkiLCJhIjoiY21uZzFhaWdpMDIyajJyczY4YWFudzJ2ZyJ9.CbG1-cZKowq0cF8qCw2RDw';
 
