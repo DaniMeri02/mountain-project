@@ -778,6 +778,16 @@ body.offline-mode #search-container input:focus {
   cursor: not-allowed;
 }
 
+/* ---- Ultra-narrow viewports: pin search dropdown to viewport edges ---- */
+@media (max-width: 360px) {
+  #search-results {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: calc(var(--nav-height) + var(--safe-top) + 4px);
+  }
+}
+
 /* ---- Mobile-first scale-ups ---- */
 @media (min-width: 480px) {
   .nav-brand { display: inline-block; }
