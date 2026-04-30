@@ -102,6 +102,15 @@
   z-index: 51;
 }
 #search-results[hidden] { display: none; }
+#search-results li {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+#search-results li:hover,
+#search-results li.active {
+  background: rgba(46, 125, 50, 0.10);
+}
 
 /* ---- Slide-in drawer ---- */
 .nav-drawer {
