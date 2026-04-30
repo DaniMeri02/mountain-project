@@ -16,55 +16,49 @@
 </head>
 <body>
 
-  <header>
-    <h1>Explore Huts and Peaks</h1>
-  </header>
-  
+  <nav id="topnav" aria-label="Main navigation">
+    <button id="nav-burger" class="nav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="nav-brand">Mountain Portal</span>
+    <div id="search-container" role="search">
+      <input id="search-box" type="search" placeholder="Search huts, peaks, ferrata…" autocomplete="off" />
+      <ul id="search-results" hidden></ul>
+    </div>
+  </nav>
+
+  <aside id="nav-drawer" class="nav-drawer" aria-hidden="true">
+    <div class="nav-drawer-header">
+      <span class="nav-drawer-title">Mountain Portal</span>
+      <button id="nav-drawer-close" class="nav-drawer-close" aria-label="Close menu">×</button>
+    </div>
+
+    <section class="nav-section" id="drawer-section-basemap">
+      <h3>Basemap</h3>
+      <label class="nav-option"><input type="radio" name="map-style" value="outdoors-v12" checked> Outdoors</label>
+      <label class="nav-option"><input type="radio" name="map-style" value="satellite-streets-v12"> Satellite 2D</label>
+      <label class="nav-option"><input type="radio" name="map-style" value="satellite-3d"> Satellite 3D</label>
+      <label class="nav-option"><input type="radio" name="map-style" value="opentopo"> TopoMap</label>
+    </section>
+
+    <section class="nav-section" id="drawer-section-layers">
+      <h3>Layers</h3>
+      <label class="nav-option"><input type="checkbox" id="toggle-trails" checked> Trails</label>
+      <label class="nav-option"><input type="checkbox" id="toggle-ferrata" checked> Via Ferrata</label>
+      <label class="nav-option"><input type="checkbox" id="toggle-icons" checked> Icons</label>
+    </section>
+
+    <section class="nav-section" id="drawer-section-offline">
+      <h3>Offline</h3>
+      <!-- offline.js injects buttons + saved-areas list here -->
+    </section>
+  </aside>
+
+  <div id="nav-backdrop" class="nav-backdrop" hidden></div>
+
   <main>
     <div id='map-container'>
       <div id='map'></div>
-
-      <div id='top-controls'>
-        <div id='menu' class='menu'>
-          <div class='menu-option'>
-            <input id='outdoors-v12' type='radio' name='rtoggle' value='outdoors-v12' checked='checked'>
-            <label for='outdoors-v12'>Outdoors</label>
-          </div>
-          <div class='menu-option'>
-            <input id='satellite-streets-v12' type='radio' name='rtoggle' value='satellite-streets-v12'>
-            <label for='satellite-streets-v12'>Sat 2D</label>
-          </div>
-          <div class='menu-option'>
-            <input id='satellite-3d' type='radio' name='rtoggle' value='satellite-streets-v12'>
-            <label for='satellite-3d'>Sat 3D</label>
-          </div>
-          <div class='menu-option'>
-            <input id='opentopo' type='radio' name='rtoggle' value='opentopo'>
-            <label for='opentopo'>TopoMap</label>
-          </div>
-        </div>
-
-        <div id='layer-toggles' class='menu'>
-          <div class='menu-option'>
-            <input id='toggle-trails' type='checkbox' checked='checked'>
-            <label for='toggle-trails'>Trails</label>
-          </div>
-          <div class='menu-option'>
-            <input id='toggle-ferrata' type='checkbox' checked='checked'>
-            <label for='toggle-ferrata'>Via Ferrata</label>
-          </div>
-          <div class='menu-option'>
-            <input id='toggle-icons' type='checkbox' checked='checked'>
-            <label for='toggle-icons'>Icons</label>
-          </div>
-        </div>
-        
-        <!-- New Search System UI -->
-        <div id='search-container'>
-          <input type='text' id='search-box' placeholder='Search huts, peaks, bivouacs, via ferrata...' autocomplete='off' />
-          <ul id='search-results'></ul>
-        </div>
-      </div>
 
       <button
         id='toggle-map-fullscreen'
