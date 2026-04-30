@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2e7d32">
   <title>Mountain Huts and Peaks Portal</title>
   <link rel="icon" href="data:,">
-  
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js'></script>
   <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css' rel='stylesheet' />
   
@@ -29,22 +32,30 @@
           </div>
           <div class='menu-option'>
             <input id='satellite-streets-v12' type='radio' name='rtoggle' value='satellite-streets-v12'>
-            <label for='satellite-streets-v12'>Satellite 2D</label>
+            <label for='satellite-streets-v12'>Sat 2D</label>
           </div>
           <div class='menu-option'>
             <input id='satellite-3d' type='radio' name='rtoggle' value='satellite-streets-v12'>
-            <label for='satellite-3d'>Satellite 3D</label>
+            <label for='satellite-3d'>Sat 3D</label>
+          </div>
+          <div class='menu-option'>
+            <input id='opentopo' type='radio' name='rtoggle' value='opentopo'>
+            <label for='opentopo'>TopoMap</label>
           </div>
         </div>
 
         <div id='layer-toggles' class='menu'>
           <div class='menu-option'>
             <input id='toggle-trails' type='checkbox' checked='checked'>
-            <label for='toggle-trails'>Trails Visibility</label>
+            <label for='toggle-trails'>Trails</label>
           </div>
           <div class='menu-option'>
             <input id='toggle-ferrata' type='checkbox' checked='checked'>
-            <label for='toggle-ferrata'>Via Ferrata Visibility</label>
+            <label for='toggle-ferrata'>Via Ferrata</label>
+          </div>
+          <div class='menu-option'>
+            <input id='toggle-icons' type='checkbox' checked='checked'>
+            <label for='toggle-icons'>Icons</label>
           </div>
         </div>
         

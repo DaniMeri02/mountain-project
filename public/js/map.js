@@ -4,6 +4,54 @@ import { hasValidElevationValue, resolveElevationFromCoordinates } from './eleva
 
 // We store the current selection to know if 3D should be applied after a style loads
 let currentMode = 'outdoors-v12';
+
+export function getBasemapMode() {
+  return currentMode;
+}
+
+export function setBasemapMode(mode) {
+  currentMode = mode;
+}
+
+export function buildOsmStyle() {
+  return {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: [
+          'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        ],
+        tileSize: 256,
+        attribution: '© OpenStreetMap contributors',
+      },
+    },
+    layers: [{ id: 'osm-raster', type: 'raster', source: 'osm' }],
+  };
+}
+
+export function buildTopoStyle() {
+  return {
+    version: 8,
+    sources: {
+      opentopo: {
+        type: 'raster',
+        tiles: [
+          'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+          'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+          'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
+        ],
+        tileSize: 256,
+        attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors',
+      },
+    },
+    glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken,
+    layers: [{ id: 'opentopo-raster', type: 'raster', source: 'opentopo' }],
+  };
+}
+
 let latestFetchToken = 0;
 let latestPanelUpdateToken = 0;
 let transientClickMarker = null;
@@ -65,23 +113,24 @@ function getFeatureCoordinates(feature, fallbackLngLat) {
   return null;
 }
 
-function removeTransientClickMarker() {
+export function removeTransientClickMarker() {
   if (transientClickMarker) {
     transientClickMarker.remove();
     transientClickMarker = null;
   }
 }
 
-function upsertTransientClickMarker(map, coordinates) {
+function upsertTransientClickMarker(map, coordinates, className = 'map-click-ping') {
   if (!coordinates) return;
 
-  if (!transientClickMarker) {
+  if (!transientClickMarker || transientClickMarker.getElement().className !== className) {
+    removeTransientClickMarker();
     const markerElement = document.createElement('div');
-    markerElement.className = 'map-click-ping';
+    markerElement.className = className;
 
     transientClickMarker = new mapboxgl.Marker({
       element: markerElement,
-      anchor: 'bottom'
+      anchor: className === 'map-draw-pin' ? 'center' : 'bottom'
     })
       .setLngLat([coordinates.lng, coordinates.lat])
       .addTo(map);
@@ -307,6 +356,9 @@ export function addMapLayers(map) {
 
 // Live database fetcher based on current screen viewport!
 export async function fetchDynamicData(map) {
+  // Skip live fetches while a saved offline area is open — overlays come from IDB.
+  if (window.__offlineMode) return;
+
   const fetchToken = ++latestFetchToken;
   const bounds = map.getBounds();
   
@@ -397,6 +449,14 @@ export function setupMapInteractivity(map) {
     if (poiAtPoint.length > 0) return;
 
     const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+
+    // In draw mode show a neutral crosshair pin instead of the purple ping;
+    // skip panel update since the click is for bbox selection, not POI lookup.
+    if (window.__drawMode) {
+      upsertTransientClickMarker(map, coordinates, 'map-draw-pin');
+      return;
+    }
+
     const panelToken = ++latestPanelUpdateToken;
 
     upsertTransientClickMarker(map, coordinates);
@@ -422,36 +482,48 @@ export function setupStyleSwitcher(map) {
   for (const input of inputs) {
     input.onclick = (e) => {
       currentMode = e.target.id;
-      const layerId = e.target.value; // The actual style URL reference
+      const layerId = e.target.value;
 
-      // Set the style
-      map.setStyle('mapbox://styles/mapbox/' + layerId);
+      if (currentMode === 'opentopo') {
+        map.setStyle(buildTopoStyle());
+      } else {
+        map.setStyle('mapbox://styles/mapbox/' + layerId);
+      }
 
       // Instantly rotate the camera when switching to/from 3D mode
       if (currentMode === 'satellite-3d') {
-        map.easeTo({ pitch: 70, bearing: 20 }); // Angle the camera!
+        map.easeTo({ pitch: 70, bearing: 20 });
       } else {
-        map.easeTo({ pitch: 0, bearing: 0 }); // Reset to flat
+        map.easeTo({ pitch: 0, bearing: 0 });
       }
     };
   }
 
-  // Setup toggle button for trails visibility
-  const toggleTrailsBtn = document.getElementById('toggle-trails');
-  if (toggleTrailsBtn) {
-    toggleTrailsBtn.addEventListener('change', (e) => {
-      if (map.getLayer('trails-lines')) {
-        map.setLayoutProperty('trails-lines', 'visibility', e.target.checked ? 'visible' : 'none');
-      }
-    });
-  }
+  // Single source of truth for overlay visibility — keep checkbox state and
+  // layer visibility in sync regardless of when style.load fires or layers
+  // are recreated by setStyle().
+  const VISIBILITY_PAIRS = [
+    ['toggle-trails', 'trails-lines'],
+    ['toggle-ferrata', 'ferrata-lines'],
+    ['toggle-icons', 'pois-points'],
+  ];
 
-  const toggleFerrataBtn = document.getElementById('toggle-ferrata');
-  if (toggleFerrataBtn) {
-    toggleFerrataBtn.addEventListener('change', (e) => {
-      if (map.getLayer('ferrata-lines')) {
-        map.setLayoutProperty('ferrata-lines', 'visibility', e.target.checked ? 'visible' : 'none');
-      }
-    });
+  for (const [inputId] of VISIBILITY_PAIRS) {
+    const input = document.getElementById(inputId);
+    if (!input) continue;
+    input.addEventListener('change', () => applyOverlayVisibility(map));
+  }
+}
+
+export function applyOverlayVisibility(map) {
+  const pairs = [
+    ['toggle-trails', 'trails-lines'],
+    ['toggle-ferrata', 'ferrata-lines'],
+    ['toggle-icons', 'pois-points'],
+  ];
+  for (const [inputId, layerId] of pairs) {
+    const input = document.getElementById(inputId);
+    if (!input || !map.getLayer(layerId)) continue;
+    map.setLayoutProperty(layerId, 'visibility', input.checked ? 'visible' : 'none');
   }
 }

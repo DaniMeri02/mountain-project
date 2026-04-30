@@ -72,33 +72,114 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
+const EMPTY_FC = { type: 'FeatureCollection', features: [] };
+
+const TRAILS_QUERY = `
+  SELECT json_build_object(
+    'type', 'FeatureCollection',
+    'features', COALESCE(json_agg(
+      json_build_object(
+        'type', 'Feature',
+        'geometry', ST_AsGeoJSON(geom)::json,
+        'properties', json_build_object('id', id, 'osm_id', osm_id, 'name', name, 'sac_scale', sac_scale)
+      )
+    ), '[]'::json)
+  ) AS geojson
+  FROM trails
+  WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
+`;
+
+const FERRATA_QUERY = `
+  WITH ferrata_rows AS (
+    SELECT
+      id,
+      osm_id,
+      name,
+      via_ferrata_scale,
+      sac_scale,
+      source_type,
+      geom
+    FROM via_ferrata
+
+    UNION ALL
+
+    SELECT
+      NULL::bigint AS id,
+      t.osm_id,
+      t.name,
+      NULL::text AS via_ferrata_scale,
+      t.sac_scale,
+      'name:ferrata'::text AS source_type,
+      t.geom
+    FROM trails t
+    WHERE
+      (
+        t.name ILIKE 'ferrata %'
+        OR t.name ILIKE '% via ferrata %'
+        OR t.name ILIKE '%ferrata%'
+      )
+      AND t.sac_scale IN (
+        'demanding_mountain_hiking',
+        'alpine_hiking',
+        'demanding_alpine_hiking',
+        'difficult_alpine_hiking'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM via_ferrata vf
+        WHERE vf.osm_id = t.osm_id
+      )
+  )
+  SELECT json_build_object(
+    'type', 'FeatureCollection',
+    'features', COALESCE(json_agg(
+      json_build_object(
+        'type', 'Feature',
+        'geometry', ST_AsGeoJSON(geom)::json,
+        'properties', json_build_object(
+          'id', id,
+          'osm_id', osm_id,
+          'name', name,
+          'via_ferrata_scale', via_ferrata_scale,
+          'sac_scale', sac_scale,
+          'source_type', source_type
+        )
+      )
+    ), '[]'::json)
+  ) AS geojson
+  FROM ferrata_rows
+  WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
+`;
+
+const POIS_QUERY = `
+  SELECT json_build_object(
+    'type', 'FeatureCollection',
+    'features', COALESCE(json_agg(
+      json_build_object(
+        'type', 'Feature',
+        'geometry', ST_AsGeoJSON(geom)::json,
+        'properties', json_build_object('id', id, 'osm_id', osm_id, 'type', type, 'name', name, 'elevation', elevation)
+      )
+    ), '[]'::json)
+  ) AS geojson
+  FROM pois
+  WHERE ST_Intersects(
+    geom,
+    ST_MakeEnvelope($1, $2, $3, $4, 4326)
+  )
+`;
+
 // Spatial API Endpoint for Trails
 fastify.get<{ Querystring: BBoxQuery }>('/api/trails', async (request, reply) => {
   const bbox = parseBBox(request.query);
 
   if (!bbox) {
-    return { type: 'FeatureCollection', features: [] };
+    return EMPTY_FC;
   }
 
-  // Pull unmodified entire LineString lines (Let Mapbox handle the rendering and clipping)
-  const query = `
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object('id', id, 'osm_id', osm_id, 'name', name, 'sac_scale', sac_scale)
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM trails
-    WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
-  `;
-
   try {
-    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
-    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
+    const result = await pool.query(TRAILS_QUERY, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
     fastify.log.error(error);
     reply.status(500).send({ error: 'Database query failed' });
@@ -110,78 +191,16 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) =
   const bbox = parseBBox(request.query);
 
   if (!bbox) {
-    return { type: 'FeatureCollection', features: [] };
+    return EMPTY_FC;
   }
 
-  const query = `
-    WITH ferrata_rows AS (
-      SELECT
-        id,
-        osm_id,
-        name,
-        via_ferrata_scale,
-        sac_scale,
-        source_type,
-        geom
-      FROM via_ferrata
-
-      UNION ALL
-
-      SELECT
-        NULL::bigint AS id,
-        t.osm_id,
-        t.name,
-        NULL::text AS via_ferrata_scale,
-        t.sac_scale,
-        'name:ferrata'::text AS source_type,
-        t.geom
-      FROM trails t
-      WHERE
-        (
-          t.name ILIKE 'ferrata %'
-          OR t.name ILIKE '% via ferrata %'
-          OR t.name ILIKE '%ferrata%'
-        )
-        AND t.sac_scale IN (
-          'demanding_mountain_hiking',
-          'alpine_hiking',
-          'demanding_alpine_hiking',
-          'difficult_alpine_hiking'
-        )
-        AND NOT EXISTS (
-          SELECT 1
-          FROM via_ferrata vf
-          WHERE vf.osm_id = t.osm_id
-        )
-    )
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object(
-            'id', id,
-            'osm_id', osm_id,
-            'name', name,
-            'via_ferrata_scale', via_ferrata_scale,
-            'sac_scale', sac_scale,
-            'source_type', source_type
-          )
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM ferrata_rows
-    WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326))
-  `;
-
   try {
-    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
-    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
+    const result = await pool.query(FERRATA_QUERY, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
     if (getErrorCode(error) === '42P01') {
       fastify.log.warn('Table "via_ferrata" not found yet. Returning empty dataset.');
-      return { type: 'FeatureCollection', features: [] };
+      return EMPTY_FC;
     }
 
     fastify.log.error(error);
@@ -194,33 +213,59 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/pois', async (request, reply) => {
   const bbox = parseBBox(request.query);
 
   if (!bbox) {
-    return { type: 'FeatureCollection', features: [] };
+    return EMPTY_FC;
   }
 
-  const query = `
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object('id', id, 'osm_id', osm_id, 'type', type, 'name', name, 'elevation', elevation)
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM pois
-    WHERE ST_Intersects(
-      geom,
-      ST_MakeEnvelope($1, $2, $3, $4, 4326)
-    )
-  `;
-
   try {
-    const result = await pool.query(query, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
-    return result.rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
+    const result = await pool.query(POIS_QUERY, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
+    return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
     fastify.log.error(error);
     reply.status(500).send({ error: 'Database query failed' });
+  }
+});
+
+// Bundle endpoint for offline downloads — single round-trip
+const MAX_OFFLINE_AREA_DEG = 0.5; // ~55 km @ 45°N
+
+fastify.get<{ Querystring: BBoxQuery }>('/api/offline/bundle', async (request, reply) => {
+  const bbox = parseBBox(request.query);
+
+  if (!bbox) {
+    return reply.status(400).send({ error: 'Invalid bbox' });
+  }
+
+  if (
+    bbox.maxLng - bbox.minLng > MAX_OFFLINE_AREA_DEG ||
+    bbox.maxLat - bbox.minLat > MAX_OFFLINE_AREA_DEG
+  ) {
+    return reply.status(413).send({ error: 'Area too large for offline download' });
+  }
+
+  const params = [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat];
+
+  try {
+    const [trails, pois, ferrata] = await Promise.all([
+      pool.query(TRAILS_QUERY, params),
+      pool.query(POIS_QUERY, params),
+      pool.query(FERRATA_QUERY, params).catch((err: unknown) => {
+        if (getErrorCode(err) === '42P01') {
+          return { rows: [{ geojson: EMPTY_FC }] };
+        }
+        throw err;
+      }),
+    ]);
+
+    return {
+      bbox: [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat],
+      generated_at: new Date().toISOString(),
+      trails: trails.rows[0]?.geojson ?? EMPTY_FC,
+      pois: pois.rows[0]?.geojson ?? EMPTY_FC,
+      ferrata: ferrata.rows[0]?.geojson ?? EMPTY_FC,
+    };
+  } catch (error) {
+    fastify.log.error(error);
+    return reply.status(500).send({ error: 'Bundle query failed' });
   }
 });
 
