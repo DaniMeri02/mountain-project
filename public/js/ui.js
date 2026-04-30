@@ -1,11 +1,43 @@
-function openPanel() {
-  document.body.classList.add('panel-open');
-}
-
 export function closePanel() {
   document.body.classList.remove('panel-open');
   const panel = document.getElementById('panel');
   if (panel) panel.innerHTML = '';
+}
+
+function initPanelSwipeDismiss() {
+  const panel = document.getElementById('panel');
+  if (!panel) return;
+
+  let startY = 0;
+  let dragging = false;
+
+  panel.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+    dragging = false;
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', (e) => {
+    const dy = e.touches[0].clientY - startY;
+    if (panel.scrollTop === 0 && dy > 0) {
+      dragging = true;
+      panel.style.transition = 'none';
+      panel.style.transform = `translateY(${dy}px)`;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  panel.addEventListener('touchend', (e) => {
+    panel.style.transition = '';
+    panel.style.transform = '';
+    if (dragging && (e.changedTouches[0].clientY - startY) > 80) {
+      closePanel();
+    }
+    dragging = false;
+  }, { passive: true });
+}
+
+function openPanel() {
+  document.body.classList.add('panel-open');
 }
 
 function attachPanelClose() {
@@ -86,6 +118,7 @@ async function fetchAiModels() {
 }
 
 fetchAiModels(); // pre-warm on module load
+initPanelSwipeDismiss();
 
 export async function updatePanel(props, coordinates) {
   const aiModels = await fetchAiModels();

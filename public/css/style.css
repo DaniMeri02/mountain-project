@@ -244,7 +244,9 @@ main {
   backdrop-filter: blur(12px);
   border-radius: var(--radius);
   cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
+  display: none;
+  align-items: center;
+  justify-content: center;
   box-shadow: var(--highlight-top), var(--shadow-md);
   z-index: 10;
   color: var(--color-ink);
@@ -351,13 +353,6 @@ body.map-fullscreen #map-container {
   box-shadow:
     0 20px 42px rgba(0, 0, 0, 0.4),
     0 4px 12px rgba(0, 0, 0, 0.28);
-}
-body.map-fullscreen #panel {
-  opacity: 0;
-  transform: translateX(36px);
-  padding: 0;
-  border-radius: 0;
-  pointer-events: none;
 }
 
 /* AI Button Styling */
@@ -844,6 +839,7 @@ body.offline-mode #search-container input:focus {
 @media (min-width: 768px) {
   :root { --nav-height: 60px; }
   #search-container { max-width: 420px; margin-left: 8px; }
+  #toggle-map-fullscreen { display: inline-flex; }
   main { grid-template-columns: 1fr min(420px, 32vw); }
   #panel {
     position: relative;
@@ -857,6 +853,13 @@ body.offline-mode #search-container input:focus {
     padding: 20px;
     z-index: auto;
     overflow-y: auto;
+  }
+  body.map-fullscreen #panel {
+    opacity: 0;
+    transform: translateX(36px);
+    padding: 0;
+    border-radius: 0;
+    pointer-events: none;
   }
   #panel::before { display: none; }
   #panel-close { display: none; }

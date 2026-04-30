@@ -70,6 +70,13 @@ function setupFullscreenMapOption(mapInstance) {
   const toggleBtn = document.getElementById('toggle-map-fullscreen');
   if (!toggleBtn) return;
 
+  const allowFullscreen = window.matchMedia('(min-width: 768px)').matches;
+  if (!allowFullscreen) {
+    toggleBtn.setAttribute('aria-hidden', 'true');
+    toggleBtn.tabIndex = -1;
+    return;
+  }
+
   const root = document.body;
   const main = document.querySelector('main');
   const panel = document.getElementById('panel');
@@ -123,11 +130,7 @@ function setupFullscreenMapOption(mapInstance) {
 
   const setFullscreenState = (enabled) => {
     mapInstance.stop();
-    mapInstance.resize();
-    scheduleResize();
-
     root.classList.toggle('map-fullscreen', enabled);
-    mapInstance.resize();
 
     const label = enabled ? 'Exit fullscreen map mode' : 'Enter fullscreen map mode';
     toggleBtn.setAttribute('aria-pressed', String(enabled));
@@ -138,12 +141,11 @@ function setupFullscreenMapOption(mapInstance) {
       : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="1,7 1,1 7,1"/><polyline points="11,1 17,1 17,7"/><polyline points="17,11 17,17 11,17"/><polyline points="7,17 1,17 1,11"/></svg>';
 
     window.dispatchEvent(new Event('layout:changed'));
-
-    scheduleResize();
     runTransitionResize();
   };
 
-  toggleBtn.addEventListener('click', () => {
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     setFullscreenState(!root.classList.contains('map-fullscreen'));
   });
 
