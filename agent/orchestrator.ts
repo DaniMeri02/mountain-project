@@ -78,6 +78,25 @@ interface ChatCompletionResponse {
   error?: { message: string; code?: number | string };
 }
 
+/**
+ * Strip reasoning leakage from AI responses.
+ * Reasoning models (Qwen3, DeepSeek-R1, etc.) sometimes emit chain-of-thought
+ * either inside <think>...</think> tags or as raw prose before the actual answer.
+ * Both forms render as visible text when injected via innerHTML on the frontend.
+ *
+ * Strategy: drop any <think>/<thinking> blocks, then trim everything before the
+ * first block-level HTML tag the prompt instructs the model to emit.
+ */
+export function sanitizeAiResponse(text: string): string {
+  let cleaned = text.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '');
+  // Strip leading code-fence wrappers some models add around HTML
+  cleaned = cleaned.replace(/^\s*```(?:html)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  // Find first expected block-level tag from the prompt schema
+  const match = cleaned.search(/<(?:h[1-6]|p|ul|ol|div)\b[^>]*>/i);
+  if (match > 0) cleaned = cleaned.slice(match);
+  return cleaned.trim();
+}
+
 async function callAiModel(
   model: AiModel,
   systemPrompt: string,
@@ -247,7 +266,8 @@ export class AgentOrchestrator {
 
     for (const model of orderedModels) {
       try {
-        description = await callAiModel(model, systemPrompt, userMessage);
+        const raw = await callAiModel(model, systemPrompt, userMessage);
+        description = sanitizeAiResponse(raw);
         modelUsed = model.label;
         break;
       } catch (err: unknown) {

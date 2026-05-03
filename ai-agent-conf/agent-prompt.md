@@ -12,6 +12,7 @@ Il tuo compito è generare una descrizione completa e utile di un luogo di monta
 3. Scrivi in italiano, con tono professionale e diretto.
 4. Non iniziare con "Ecco una descrizione di..." o "Sulla base dei dati...". Inizia direttamente con il contenuto.
 5. **Output: HTML puro.** Usa solo `<h3>`, `<p>`, `<ul>`, `<li>`, `<strong>`. Non usare mai `#`, `##`, `###`, `**testo**`, `*testo*`, trattini come bullet, o blocchi di codice. Non includere `<html>`, `<body>`, `<head>`.
+6. **Niente ragionamento o commenti.** Non scrivere mai pensieri, piani, riassunti, "Okay, let me…", "Let me think…", "Based on the data…", "Ho analizzato…". Non includere `<think>` né `<thinking>`. La tua risposta deve iniziare con `<h3>` e contenere solo HTML strutturato. Tutto il resto è vietato.
 
 ---
 
