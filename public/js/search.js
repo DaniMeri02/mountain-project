@@ -36,21 +36,47 @@ export async function initSearch(map) {
   }
 
   const PLACEHOLDER_TIERS = [
-    { minWidth: 280, text: 'Search huts, peaks, bivouacs, via ferrata...' },
-    { minWidth: 210, text: 'Search huts, peaks, bivouacs...' },
-    { minWidth: 150, text: 'Search huts, peaks...' },
-    { minWidth: 100, text: 'Search huts...' },
-    { minWidth: 0,   text: 'Search...' }
+    'Search huts, peaks, bivouacs, via ferrata',
+    'Search huts, peaks, bivouacs',
+    'Search huts, peaks',
+    'Search huts',
+    'Search'
   ];
+  const ELLIPSIS = '…';
 
   let debounceTimer;
   let lastMatches = [];
   let placeholderRaf = 0;
+  let measureCanvas = null;
+
+  function measureTextWidth(text, font) {
+    if (!measureCanvas) measureCanvas = document.createElement('canvas');
+    const ctx = measureCanvas.getContext('2d');
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  }
 
   function syncSearchPlaceholder() {
-    const width = searchBox.clientWidth;
-    const tier = PLACEHOLDER_TIERS.find(t => width >= t.minWidth);
-    searchBox.placeholder = tier.text;
+    const cs = window.getComputedStyle(searchBox);
+    const padLeft = parseFloat(cs.paddingLeft) || 0;
+    const padRight = parseFloat(cs.paddingRight) || 0;
+    const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+    const borderRight = parseFloat(cs.borderRightWidth) || 0;
+    // Use offsetWidth (includes border) and subtract padding+border to get content box.
+    // Reserve a small buffer so we never sit flush against the edge.
+    const available = searchBox.offsetWidth - padLeft - padRight - borderLeft - borderRight - 6;
+    if (available <= 0) return;
+
+    const font = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+
+    for (const text of PLACEHOLDER_TIERS) {
+      const candidate = text + ELLIPSIS;
+      if (measureTextWidth(candidate, font) <= available) {
+        if (searchBox.placeholder !== candidate) searchBox.placeholder = candidate;
+        return;
+      }
+    }
+    if (searchBox.placeholder !== ELLIPSIS) searchBox.placeholder = ELLIPSIS;
   }
 
   function schedulePlaceholderSync() {

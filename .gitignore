@@ -6,4 +6,6 @@ scripts/via-ferrata-progress.json
 scripts/via-ferrata-failed-chunks.json
 agent-sources-dump.txt
 .claude/
-.playwright-mcp
+.playwright-mcp/
+test-results/
+playwright-report/
