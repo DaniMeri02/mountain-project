@@ -880,10 +880,10 @@ export async function openArea(map, areaId) {
     map.setStyle(buildTopoStyle());
     syncOpentopoRadio();
   } else if (area.basemap === 'osm') {
-    setBasemapMode('opentopo');
+    setBasemapMode('osm');
     map.once('style.load', onStyleLoad);
     map.setStyle(buildOsmStyle());
-    syncOpentopoRadio();
+    syncRadio('osm');
   } else if (needsMapboxSwitch) {
     setBasemapMode('outdoors-v12');
     map.once('style.load', onStyleLoad);

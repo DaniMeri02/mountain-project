@@ -486,6 +486,8 @@ export function setupStyleSwitcher(map) {
 
       if (currentMode === 'opentopo') {
         map.setStyle(buildTopoStyle());
+      } else if (currentMode === 'osm') {
+        map.setStyle(buildOsmStyle());
       } else {
         map.setStyle('mapbox://styles/mapbox/' + layerId);
       }
