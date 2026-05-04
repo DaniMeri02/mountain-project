@@ -84,4 +84,33 @@ test.describe('basemap drawer', () => {
 
     await page.screenshot({ path: path.join(SHOT_DIR, 'basemap-topo.png'), fullPage: false });
   });
+
+  test('OSM basemap keeps overlay layers and has no glyphs validation error', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto('/');
+    await page.waitForFunction(() => Boolean((window as unknown as { __map?: any }).__map));
+    await page.waitForTimeout(800);
+
+    await openDrawer(page);
+    await page.click('#osm');
+    // Allow setStyle + style.load + addMapLayers to complete
+    await page.waitForTimeout(2000);
+
+    const info = await getMapStyleInfo(page);
+    expect(info, 'window.__map missing').not.toBeNull();
+    expect(info!.layerIds, 'pois-points layer missing on OSM').toContain('pois-points');
+    expect(info!.layerIds, 'trails-lines layer missing on OSM').toContain('trails-lines');
+    expect(info!.layerIds, 'ferrata-lines layer missing on OSM').toContain('ferrata-lines');
+
+    const glyphsError = consoleErrors.find(
+      (e) => e.includes('glyphs') || e.includes('text-field'),
+    );
+    expect(glyphsError, `Unexpected console error: ${glyphsError}`).toBeUndefined();
+
+    await page.screenshot({ path: path.join(SHOT_DIR, 'basemap-osm-overlays.png'), fullPage: false });
+  });
 });

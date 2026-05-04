@@ -16,6 +16,7 @@ export function setBasemapMode(mode) {
 export function buildOsmStyle() {
   return {
     version: 8,
+    glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken,
     sources: {
       osm: {
         type: 'raster',
