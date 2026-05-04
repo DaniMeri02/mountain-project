@@ -1,6 +1,6 @@
 import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData, applyOverlayVisibility } from './map.js';
 import { initSearch } from './search.js';
-import { initOfflineModule } from './offline.js';
+import { initOfflineModule } from './offline/index.js';
 import { closePanel } from './ui.js';
 import { initNav } from './nav.js';
 
