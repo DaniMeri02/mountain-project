@@ -611,6 +611,104 @@ body.map-fullscreen #map-container {
   }
 }
 
+/* ── Route finder UI ────────────────────────────────────────────────────── */
+
+.routing-btn { width: 100%; text-align: left; }
+body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+
+#route-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: rgba(46, 100, 140, 0.95);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-align: center;
+  max-width: calc(100% - 24px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  white-space: nowrap;
+}
+#route-hint[hidden] { display: none; }
+
+.route-point {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+.route-point-start { background: #22c55e; }
+.route-point-end { background: #ef4444; }
+
+.route-distance { font-weight: 600; font-size: 1.05rem; margin: 4px 0 10px; }
+
+.route-roundtrip-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.route-alt-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.route-alt-item {
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  font-size: 0.88rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.6);
+  transition: background var(--transition), border-color var(--transition);
+}
+.route-alt-item:hover { background: rgba(46, 125, 50, 0.10); border-color: rgba(46, 125, 50, 0.3); }
+.route-alt-selected { background: rgba(255, 215, 0, 0.2); border-color: #c8a800; font-weight: 600; }
+
+.route-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.route-actions .offline-btn { flex: 1 1 auto; }
+
+.panel-close-btn {
+  position: absolute;
+  top: var(--space-1); right: var(--space-1);
+  width: 2rem; height: 2rem;
+  border: none; background: transparent;
+  font-size: 1.4rem; line-height: 1;
+  color: var(--color-ink-soft);
+  cursor: pointer; border-radius: var(--radius);
+}
+.panel-close-btn:hover { background: rgba(31, 41, 51, 0.06); color: var(--color-ink); }
+
+.route-toast {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: rgba(180, 0, 0, 0.88);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-align: center;
+  max-width: calc(100% - 24px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ── Offline area UI ─────────────────────────────────────────────────────── */
 
 #offline-controls {

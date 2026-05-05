@@ -114,6 +114,13 @@ function getFeatureCoordinates(feature, fallbackLngLat) {
   return null;
 }
 
+export function getTrailFeatureCache() { return trailFeatureCache; }
+export function getFerrataFeatureCache() { return ferrataFeatureCache; }
+
+export function bumpPanelToken() {
+  return ++latestPanelUpdateToken;
+}
+
 export function removeTransientClickMarker() {
   if (transientClickMarker) {
     transientClickMarker.remove();
@@ -353,6 +360,39 @@ export function addMapLayers(map) {
       }
     }, ferrataBeforeLayerId);
   }
+  // Route highlight sources and layers — sit above trail/ferrata layers
+  if (!map.getSource('route-highlight-src')) {
+    map.addSource('route-highlight-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!map.getSource('route-alt-src')) {
+    map.addSource('route-alt-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!map.getLayer('route-alt')) {
+    map.addLayer({
+      id: 'route-alt',
+      type: 'line',
+      source: 'route-alt-src',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': ['coalesce', ['get', 'color'], '#00BFFF'],
+        'line-width': 7,
+        'line-opacity': 0.45
+      }
+    });
+  }
+  if (!map.getLayer('route-highlight')) {
+    map.addLayer({
+      id: 'route-highlight',
+      type: 'line',
+      source: 'route-highlight-src',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
+        'line-width': 9,
+        'line-opacity': 0.65
+      }
+    });
+  }
 } // matches the original close of addMapLayers
 
 // Live database fetcher based on current screen viewport!
@@ -420,6 +460,7 @@ export function setupMapInteractivity(map) {
   });
 
   map.on('click', 'pois-points', async (e) => {
+    if (window.__routingMode) return;
     removeTransientClickMarker();
     const panelToken = ++latestPanelUpdateToken;
 
@@ -450,6 +491,9 @@ export function setupMapInteractivity(map) {
     if (poiAtPoint.length > 0) return;
 
     const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+
+    // Routing mode click is handled by mode.js — skip panel update.
+    if (window.__routingMode) return;
 
     // In draw mode show a neutral crosshair pin instead of the purple ping;
     // skip panel update since the click is for bbox selection, not POI lookup.

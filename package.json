@@ -10,6 +10,8 @@
     "dev": "tsx watch server.ts",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
+    "fetch:trails": "tsx scripts/fetch-trails.ts",
+    "patch:tracks": "tsx scripts/patch-tracks-area.ts",
     "fetch:ferrata": "tsx scripts/fetch-via-ferrata.ts",
     "export:ferrata": "tsx scripts/export-via-ferrata.ts",
     "import:ferrata": "tsx scripts/import-via-ferrata.ts",

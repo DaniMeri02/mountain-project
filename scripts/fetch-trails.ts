@@ -40,12 +40,14 @@ async function fetchTrails() {
       await delay(15000);
     }
 
-    // Fetch all mountain paths (even unrated ones), but filter out generic unrated urban footways later
+    // Fetch mountain paths, rated footways, and tracks (mountain approach roads)
     const query = `
       [out:json][timeout:300];
       (
         way["highway"="path"]${bbox};
         way["highway"="footway"]["sac_scale"]${bbox};
+        way["highway"="track"][~"tracktype"~"^(grade[1-4]|)$"]${bbox};
+        way["highway"="track"][!"tracktype"]${bbox};
       );
       out body;
       >;
@@ -111,7 +113,7 @@ async function fetchTrails() {
             properties: {
               id: way.id,
               name: tags.name || '',
-              sac_scale: tags.sac_scale || 'unknown',
+              sac_scale: tags.sac_scale || (highwayType === 'track' ? 'track' : 'unknown'),
               trail_visibility: tags.trail_visibility || 'unknown'
             },
             geometry: {

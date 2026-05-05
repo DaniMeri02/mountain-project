@@ -1,6 +1,7 @@
 import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicData, applyOverlayVisibility } from './map.js';
 import { initSearch } from './search.js';
 import { initOfflineModule } from './offline/index.js';
+import { initRoutingModule } from './routing/index.js';
 import { closePanel } from './ui.js';
 import { initNav } from './nav.js';
 
@@ -208,6 +209,9 @@ initSearch(map);
 
 // Initialize offline-area downloader and saved-area registry
 initOfflineModule(map);
+
+// Initialize trail route finder
+initRoutingModule(map);
 
 // Resize map when panel content changes (e.g. POI selected, AI description loaded)
 window.addEventListener('panel:updated', () => {
