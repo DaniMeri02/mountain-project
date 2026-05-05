@@ -375,8 +375,10 @@ export function addMapLayers(map) {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': ['coalesce', ['get', 'color'], '#00BFFF'],
-        'line-width': 7,
-        'line-opacity': 0.45
+        'line-width': 10,
+        'line-gap-width': 4,
+        'line-opacity': 0.28,
+        'line-blur': 0.6
       }
     });
   }
@@ -388,8 +390,10 @@ export function addMapLayers(map) {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': ['coalesce', ['get', 'color'], '#FFD700'],
-        'line-width': 9,
-        'line-opacity': 0.65
+        'line-width': 12,
+        'line-gap-width': 5,
+        'line-opacity': 0.35,
+        'line-blur': 0.5
       }
     });
   }
