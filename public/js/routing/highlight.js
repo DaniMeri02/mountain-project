@@ -1,15 +1,19 @@
 const HIGHLIGHT_SRC = 'route-highlight-src';
 const ALT_SRC = 'route-alt-src';
 
-function toFeatures(edges, color) {
-  return edges.map(({ featureId, coords, reversed }) => ({
-    type: 'Feature',
-    properties: { featureId, color },
-    geometry: {
-      type: 'LineString',
-      coordinates: reversed ? [...coords].reverse() : coords
-    }
-  }));
+function toFeatures(edges, color, routeIndex) {
+  return edges.map(({ featureId, coords, reversed }) => {
+    const properties = { featureId, color };
+    if (routeIndex !== undefined && routeIndex !== null) properties.routeIndex = routeIndex;
+    return {
+      type: 'Feature',
+      properties,
+      geometry: {
+        type: 'LineString',
+        coordinates: reversed ? [...coords].reverse() : coords
+      }
+    };
+  });
 }
 
 export function setRouteHighlight(map, edges) {
@@ -22,8 +26,8 @@ export function setRouteReturn(map, edges) {
   if (src) src.setData({ type: 'FeatureCollection', features: toFeatures(edges, '#20B2AA') });
 }
 
-export function setRouteAlternatives(map, edgeSets) {
-  const features = edgeSets.flatMap(edges => toFeatures(edges, '#00BFFF'));
+export function setRouteAlternatives(map, edgeSets, routeIndices = []) {
+  const features = edgeSets.flatMap((edges, i) => toFeatures(edges, '#00BFFF', routeIndices[i]));
   const src = map.getSource(ALT_SRC);
   if (src) src.setData({ type: 'FeatureCollection', features });
 }

@@ -1,8 +1,11 @@
 let _clickHandler = null;
 let _keyHandler = null;
 let _hintEl = null;
+let _hintTextEl = null;
+let _hintCancelBtn = null;
 let _startMarker = null;
 let _endMarker = null;
+let _mapRef = null;
 
 function buildRouteMarker(className) {
   const el = document.createElement('div');
@@ -15,6 +18,7 @@ export function isRouting() {
 }
 
 export function startRoutingMode(map, onBothPoints) {
+  _mapRef = map;
   window.__routingMode = true;
   document.body.classList.add('routing-active');
   map.getCanvas().style.cursor = 'crosshair';
@@ -74,10 +78,23 @@ function showHint(text) {
   if (!_hintEl) {
     _hintEl = document.createElement('div');
     _hintEl.id = 'route-hint';
+    _hintTextEl = document.createElement('span');
+    _hintTextEl.className = 'route-hint-text';
+    _hintCancelBtn = document.createElement('button');
+    _hintCancelBtn.type = 'button';
+    _hintCancelBtn.className = 'route-hint-cancel';
+    _hintCancelBtn.textContent = 'Cancel';
+    _hintCancelBtn.addEventListener('click', () => {
+      if (!_mapRef) return;
+      cancelRoutingMode(_mapRef);
+      clearRoutingMarkers();
+    });
+    _hintEl.appendChild(_hintTextEl);
+    _hintEl.appendChild(_hintCancelBtn);
     const host = document.getElementById('map-container') || document.body;
     host.appendChild(_hintEl);
   }
-  _hintEl.textContent = text;
+  if (_hintTextEl) _hintTextEl.textContent = text;
   _hintEl.hidden = false;
 }
 

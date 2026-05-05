@@ -11,11 +11,13 @@ let _fromKey = null;
 let _toKey = null;
 let _alternatives = [];
 let _selectedIdx = 0;
+let _altClickAttached = false;
 
 export function initRoutingModule(map) {
   _map = map;
   injectDrawerSection();
   attachFindRouteButton();
+  attachAltClickHandler();
 }
 
 function injectDrawerSection() {
@@ -36,6 +38,7 @@ function attachFindRouteButton() {
       cancelRoutingMode(_map);
       clearRouteHighlight(_map);
       clearRoutingMarkers();
+      window.__routingHasRoute = false;
       document.body.classList.remove('panel-open');
       return;
     }
@@ -47,6 +50,7 @@ function attachFindRouteButton() {
 }
 
 async function computeAndDisplayRoute(startCoord, endCoord) {
+  window.__routingHasRoute = false;
   const expand = 0.05;
   const minLng = Math.min(startCoord[0], endCoord[0]) - expand;
   const minLat = Math.min(startCoord[1], endCoord[1]) - expand;
@@ -85,9 +89,11 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
     if (!_alternatives.length) { clearRoutingMarkers(); showToast('No route found between these points.'); return; }
 
     _selectedIdx = 0;
+    window.__routingHasRoute = true;
     renderRoute();
   } catch (err) {
     console.error('Route computation failed', err);
+    window.__routingHasRoute = false;
     showToast('Failed to compute route.');
   }
 }
@@ -95,9 +101,23 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
 function renderRoute() {
   const selected = _alternatives[_selectedIdx];
   setRouteHighlight(_map, selected);
-  const alts = _alternatives.filter((_, i) => i !== _selectedIdx);
-  setRouteAlternatives(_map, alts);
+  const altEntries = _alternatives
+    .map((route, idx) => ({ route, idx }))
+    .filter(({ idx }) => idx !== _selectedIdx);
+  setRouteAlternatives(
+    _map,
+    altEntries.map((entry) => entry.route),
+    altEntries.map((entry) => entry.idx)
+  );
   showRoutePanel();
+}
+
+function selectRoute(idx) {
+  if (!Number.isFinite(idx)) return;
+  if (idx < 0 || idx >= _alternatives.length) return;
+  if (idx === _selectedIdx) return;
+  _selectedIdx = idx;
+  renderRoute();
 }
 
 function routeDistanceKm(edges) {
@@ -158,8 +178,7 @@ function showRoutePanel() {
   panel.querySelector('.route-alt-list').addEventListener('click', (e) => {
     const item = e.target.closest('.route-alt-item');
     if (!item) return;
-    _selectedIdx = parseInt(item.dataset.idx, 10);
-    renderRoute();
+    selectRoute(parseInt(item.dataset.idx, 10));
   });
 
   panel.querySelector('#route-download-gpx').addEventListener('click', () => {
@@ -171,8 +190,30 @@ function showRoutePanel() {
     clearRouteHighlight(_map);
     clearRoutingMarkers();
     cancelRoutingMode(_map);
+    window.__routingHasRoute = false;
     document.body.classList.remove('panel-open');
   });
+}
+
+function attachAltClickHandler() {
+  if (_altClickAttached || !_map) return;
+  const bind = () => {
+    if (_altClickAttached || !_map.getLayer('route-alt')) return;
+    _map.on('click', 'route-alt', (e) => {
+      const feature = e.features && e.features[0];
+      const idx = feature && feature.properties ? Number(feature.properties.routeIndex) : NaN;
+      if (Number.isFinite(idx)) selectRoute(idx);
+    });
+    _map.on('mouseenter', 'route-alt', () => {
+      _map.getCanvas().style.cursor = 'pointer';
+    });
+    _map.on('mouseleave', 'route-alt', () => {
+      if (!window.__routingMode) _map.getCanvas().style.cursor = '';
+    });
+    _altClickAttached = true;
+  };
+  if (_map.isStyleLoaded()) bind();
+  _map.on('style.load', bind);
 }
 
 function showToast(msg) {

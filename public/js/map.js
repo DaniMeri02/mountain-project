@@ -495,6 +495,17 @@ export function setupMapInteractivity(map) {
     // Routing mode click is handled by mode.js — skip panel update.
     if (window.__routingMode) return;
 
+     // Avoid replacing the route panel when clicking on a route line.
+    if (window.__routingHasRoute) {
+      const routeLayers = [];
+      if (map.getLayer('route-highlight')) routeLayers.push('route-highlight');
+      if (map.getLayer('route-alt')) routeLayers.push('route-alt');
+      if (routeLayers.length > 0) {
+        const routeHits = map.queryRenderedFeatures(e.point, { layers: routeLayers });
+        if (routeHits.length > 0) return;
+      }
+    }
+
     // In draw mode show a neutral crosshair pin instead of the purple ping;
     // skip panel update since the click is for bbox selection, not POI lookup.
     if (window.__drawMode) {
