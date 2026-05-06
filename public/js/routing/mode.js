@@ -99,12 +99,12 @@ export function cancelViaMode(map) {
 
 export function setRoutingMarkers(map, startCoord, endCoord) {
   if (startCoord) {
-    if (!_startMarker) _startMarker = buildRouteMarker('route-point-start').addTo(map);
-    _startMarker.setLngLat(startCoord);
+    if (!_startMarker) _startMarker = buildRouteMarker('route-point-start').setLngLat(startCoord).addTo(map);
+    else _startMarker.setLngLat(startCoord);
   }
   if (endCoord) {
-    if (!_endMarker) _endMarker = buildRouteMarker('route-point-end').addTo(map);
-    _endMarker.setLngLat(endCoord);
+    if (!_endMarker) _endMarker = buildRouteMarker('route-point-end').setLngLat(endCoord).addTo(map);
+    else _endMarker.setLngLat(endCoord);
   }
 }
 

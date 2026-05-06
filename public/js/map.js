@@ -456,10 +456,12 @@ export async function fetchDynamicData(map) {
 
 export function setupMapInteractivity(map) {
   map.on('mouseenter', 'pois-points', () => {
+    if (window.__routingMode || window.__routingViaMode || window.__drawMode) return;
     map.getCanvas().style.cursor = 'pointer';
   });
-  
+
   map.on('mouseleave', 'pois-points', () => {
+    if (window.__routingMode || window.__routingViaMode || window.__drawMode) return;
     map.getCanvas().style.cursor = '';
   });
 

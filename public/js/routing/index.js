@@ -26,6 +26,8 @@ let _endCoord = null;
 let _viaCoord = null;
 let _viaKey = null;
 let _viaUiAttached = false;
+let _panelUserClosed = false;
+let _reopenBtn = null;
 
 export function initRoutingModule(map) {
   _map = map;
@@ -33,6 +35,7 @@ export function initRoutingModule(map) {
   attachFindRouteButton();
   attachAltClickHandler();
   attachViaUiHandlers();
+  createReopenButton();
 }
 
 function injectDrawerSection() {
@@ -59,6 +62,7 @@ function attachFindRouteButton() {
       _viaKey = null;
       window.__routingHasRoute = false;
       document.body.classList.remove('panel-open');
+      syncReopenButton();
       return;
     }
     closeNav();
@@ -75,6 +79,7 @@ function attachFindRouteButton() {
 async function computeAndDisplayRoute(startCoord, endCoord) {
   const hadRoute = window.__routingHasRoute;
   window.__routingHasRoute = false;
+  _panelUserClosed = false;
   _startCoord = startCoord;
   _endCoord = endCoord;
 
@@ -170,7 +175,9 @@ function renderRoute() {
     altEntries.map((entry) => entry.route),
     altEntries.map((entry) => entry.idx)
   );
-  showRoutePanel();
+  if (!_panelUserClosed) {
+    showRoutePanel();
+  }
 }
 
 function selectRoute(idx) {
@@ -292,7 +299,9 @@ function showRoutePanel() {
   `;
 
   panel.querySelector('#panel-close').addEventListener('click', () => {
+    _panelUserClosed = true;
     document.body.classList.remove('panel-open');
+    syncReopenButton();
   });
 
   panel.querySelector('#route-roundtrip').addEventListener('change', (e) => {
@@ -364,6 +373,7 @@ function showRoutePanel() {
     _viaKey = null;
     window.__routingHasRoute = false;
     document.body.classList.remove('panel-open');
+    syncReopenButton();
   });
 }
 
@@ -377,10 +387,11 @@ function attachAltClickHandler() {
       if (Number.isFinite(idx)) selectRoute(idx);
     });
     _map.on('mouseenter', 'route-alt', () => {
+      if (window.__routingMode || window.__routingViaMode || window.__drawMode) return;
       _map.getCanvas().style.cursor = 'pointer';
     });
     _map.on('mouseleave', 'route-alt', () => {
-      if (!window.__routingMode) _map.getCanvas().style.cursor = '';
+      if (!window.__routingMode && !window.__routingViaMode && !window.__drawMode) _map.getCanvas().style.cursor = '';
     });
     _altClickAttached = true;
   };
@@ -409,4 +420,35 @@ function attachViaUiHandlers() {
     if (document.body.classList.contains('panel-open')) showRoutePanel();
   });
   _viaUiAttached = true;
+}
+
+function syncReopenButton() {
+  if (!_reopenBtn) return;
+  const hasRoute = !!window.__routingHasRoute;
+  const panelOpen = document.body.classList.contains('panel-open');
+  _reopenBtn.hidden = !(hasRoute && !panelOpen);
+}
+
+function createReopenButton() {
+  const btn = document.createElement('button');
+  btn.id = 'route-reopen-btn';
+  btn.type = 'button';
+  btn.className = 'route-reopen-btn';
+  btn.textContent = '🗺 Route';
+  btn.hidden = true;
+  btn.addEventListener('click', () => {
+    _panelUserClosed = false;
+    showRoutePanel();
+    syncReopenButton();
+  });
+  const host = document.getElementById('map-container') || document.body;
+  host.appendChild(btn);
+  _reopenBtn = btn;
+
+  new MutationObserver(() => {
+    if (!document.body.classList.contains('panel-open') && window.__routingHasRoute) {
+      _panelUserClosed = true;
+    }
+    syncReopenButton();
+  }).observe(document.body, { attributeFilter: ['class'] });
 }
