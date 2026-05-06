@@ -127,6 +127,20 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
       return;
     }
 
+    // If snapped nodes are in different components, retry preferring larger components.
+    // Prevents small orphan stubs (parking paths, short trails) from trapping the snap.
+    const fromNode0 = _graph.nodes.get(_fromKey);
+    const toNode0 = _graph.nodes.get(_toKey);
+    if (fromNode0 && toNode0 && fromNode0.componentSize !== toNode0.componentSize) {
+      let maxComp = 0;
+      for (const n of _graph.nodes.values()) if (n.componentSize > maxComp) maxComp = n.componentSize;
+      const minComp = Math.max(10, Math.floor(maxComp * 0.05));
+      const retryFrom = snapToNode(_graph, startCoord, 500, minComp);
+      const retryTo = snapToNode(_graph, endCoord, 500, minComp);
+      if (retryFrom) _fromKey = retryFrom;
+      if (retryTo) _toKey = retryTo;
+    }
+
     const fromNode = _graph.nodes.get(_fromKey);
     const toNode = _graph.nodes.get(_toKey);
     if (fromNode || toNode) setRoutingMarkers(_map, fromNode && fromNode.coord, toNode && toNode.coord);

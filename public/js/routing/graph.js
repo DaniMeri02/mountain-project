@@ -118,11 +118,12 @@ export function buildGraph(features) {
   return { nodes, edges };
 }
 
-// Snaps to the nearest node within maxMeters.
-export function snapToNode(graph, coord, maxMeters = 300) {
+// Snaps to the nearest node within maxMeters. minComponentSize filters out tiny isolated stubs.
+export function snapToNode(graph, coord, maxMeters = 300, minComponentSize = 0) {
   let bestKey = null;
   let bestDist = Infinity;
   for (const [key, node] of graph.nodes) {
+    if (node.componentSize < minComponentSize) continue;
     const d = haversineMeters(coord, node.coord);
     if (d < bestDist) {
       bestDist = d;
