@@ -218,7 +218,7 @@ function sharedFraction(r1, r2) {
   return shared / Math.max(r1.length, r2.length, 1);
 }
 
-// Runs Dijkstra 3 times, penalizing already-used edges 8× to find diverging alternatives
+// Runs Dijkstra up to 4 times, penalizing already-used edges 8× to find diverging alternatives
 export function findAlternatives(graph, fromKey, toKey) {
   const p1 = dijkstra(graph, fromKey, toKey);
   if (!p1) return [];
@@ -233,7 +233,13 @@ export function findAlternatives(graph, fromKey, toKey) {
     const pen2 = { ...pen1 };
     for (const e of p2) pen2[e.edgeIndex] = 8;
     const p3 = dijkstra(graph, fromKey, toKey, pen2);
-    if (p3 && sharedFraction(p1, p3) < 0.7) results.push(p3);
+    if (p3 && sharedFraction(p1, p3) < 0.7) {
+      results.push(p3);
+      const pen3 = { ...pen2 };
+      for (const e of p3) pen3[e.edgeIndex] = 8;
+      const p4 = dijkstra(graph, fromKey, toKey, pen3);
+      if (p4 && sharedFraction(p1, p4) < 0.7) results.push(p4);
+    }
   }
 
   return results;

@@ -88,6 +88,7 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
 
     if (!_alternatives.length) { clearRoutingMarkers(); showToast('No route found between these points.'); return; }
 
+    _alternatives = sortAlternativesByDistance(_alternatives);
     _selectedIdx = 0;
     window.__routingHasRoute = true;
     renderRoute();
@@ -127,6 +128,13 @@ function routeDistanceKm(edges) {
     for (let i = 1; i < seg.length; i++) total += haversineMeters(seg[i], seg[i - 1]);
   }
   return total / 1000;
+}
+
+function sortAlternativesByDistance(routes) {
+  return routes
+    .map((route) => ({ route, distance: routeDistanceKm(route) }))
+    .sort((a, b) => a.distance - b.distance)
+    .map((entry) => entry.route);
 }
 
 function showRoutePanel() {
