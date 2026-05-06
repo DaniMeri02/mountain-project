@@ -772,8 +772,45 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
   color: #6b7280;
 }
 
-.route-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.route-actions .offline-btn { flex: 1 1 auto; }
+.route-actions { display: flex; gap: 8px; margin-top: 4px; }
+.route-actions .offline-btn { flex: 1 1 0; }
+
+#route-download-gpx {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(46, 125, 50, 0.25);
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+#route-download-gpx:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 3px 8px rgba(46, 125, 50, 0.35);
+  transform: translateY(-1px);
+}
+#route-download-gpx:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+#routing-cancel-btn {
+  background: #fff;
+  color: #b91c1c;
+  border-color: #fca5a5;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+#routing-cancel-btn:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+}
 
 .panel-close-btn {
   position: absolute;
