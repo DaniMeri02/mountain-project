@@ -659,6 +659,7 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
 }
 .route-point-start { background: #22c55e; }
 .route-point-end { background: #ef4444; }
+.route-point-via { background: #3b82f6; }
 
 .route-distance { font-weight: 600; font-size: 1.05rem; margin: 4px 0 10px; }
 
@@ -669,6 +670,17 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
   font-size: 0.9rem;
   cursor: pointer;
   margin-bottom: 10px;
+}
+.route-via-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.route-via-note {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: #4b5563;
 }
 
 .route-alt-list {
@@ -690,6 +702,11 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
 }
 .route-alt-item:hover { background: rgba(46, 125, 50, 0.10); border-color: rgba(46, 125, 50, 0.3); }
 .route-alt-selected { background: rgba(255, 215, 0, 0.2); border-color: #c8a800; font-weight: 600; }
+.route-alt-empty {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
 
 .route-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .route-actions .offline-btn { flex: 1 1 auto; }

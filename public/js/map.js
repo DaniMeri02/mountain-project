@@ -464,7 +464,7 @@ export function setupMapInteractivity(map) {
   });
 
   map.on('click', 'pois-points', async (e) => {
-    if (window.__routingMode) return;
+    if (window.__routingMode || window.__routingViaMode) return;
     removeTransientClickMarker();
     const panelToken = ++latestPanelUpdateToken;
 
@@ -497,7 +497,7 @@ export function setupMapInteractivity(map) {
     const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
 
     // Routing mode click is handled by mode.js — skip panel update.
-    if (window.__routingMode) return;
+    if (window.__routingMode || window.__routingViaMode) return;
 
      // Avoid replacing the route panel when clicking on a route line.
     if (window.__routingHasRoute) {

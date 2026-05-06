@@ -1,7 +1,16 @@
-import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters } from './graph.js';
+import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra } from './graph.js';
 import { generateGpx, downloadGpx } from './gpx.js';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight.js';
-import { startRoutingMode, cancelRoutingMode, clearRoutingMarkers, setRoutingMarkers } from './mode.js';
+import {
+  startRoutingMode,
+  cancelRoutingMode,
+  clearRoutingMarkers,
+  setRoutingMarkers,
+  startViaMode,
+  cancelViaMode,
+  setViaMarker,
+  clearViaMarker
+} from './mode.js';
 import { closeNav } from '../nav.js';
 import { bumpPanelToken } from '../map.js';
 
@@ -12,6 +21,10 @@ let _toKey = null;
 let _alternatives = [];
 let _selectedIdx = 0;
 let _altClickAttached = false;
+let _startCoord = null;
+let _endCoord = null;
+let _viaCoord = null;
+let _viaKey = null;
 
 export function initRoutingModule(map) {
   _map = map;
@@ -38,11 +51,19 @@ function attachFindRouteButton() {
       cancelRoutingMode(_map);
       clearRouteHighlight(_map);
       clearRoutingMarkers();
+      cancelViaMode(_map);
+      clearViaMarker();
+      _viaCoord = null;
+      _viaKey = null;
       window.__routingHasRoute = false;
       document.body.classList.remove('panel-open');
       return;
     }
     closeNav();
+    cancelViaMode(_map);
+    clearViaMarker();
+    _viaCoord = null;
+    _viaKey = null;
     startRoutingMode(_map, async (startCoord, endCoord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
     });
@@ -50,7 +71,11 @@ function attachFindRouteButton() {
 }
 
 async function computeAndDisplayRoute(startCoord, endCoord) {
+  const hadRoute = window.__routingHasRoute;
   window.__routingHasRoute = false;
+  _startCoord = startCoord;
+  _endCoord = endCoord;
+
   const expand = 0.05;
   const minLng = Math.min(startCoord[0], endCoord[0]) - expand;
   const minLat = Math.min(startCoord[1], endCoord[1]) - expand;
@@ -73,20 +98,53 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
     ];
 
     _graph = buildGraph(features);
-    if (!_graph.nodes.size) { clearRoutingMarkers(); showToast('No trail data found in this area.'); return; }
+    if (!_graph.nodes.size) {
+      clearRoutingMarkers();
+      showToast('No trail data found in this area.');
+      if (hadRoute) window.__routingHasRoute = true;
+      return;
+    }
     _fromKey = snapToNode(_graph, startCoord);
     _toKey = snapToNode(_graph, endCoord);
 
-    if (!_fromKey) { clearRoutingMarkers(); showToast('No trail nearby — click closer to a trail.'); return; }
-    if (!_toKey) { clearRoutingMarkers(); showToast('No trail nearby at end point — click closer to a trail.'); return; }
+    if (!_fromKey) {
+      clearRoutingMarkers();
+      showToast('No trail nearby — click closer to a trail.');
+      if (hadRoute) window.__routingHasRoute = true;
+      return;
+    }
+    if (!_toKey) {
+      clearRoutingMarkers();
+      showToast('No trail nearby at end point — click closer to a trail.');
+      if (hadRoute) window.__routingHasRoute = true;
+      return;
+    }
 
     const fromNode = _graph.nodes.get(_fromKey);
     const toNode = _graph.nodes.get(_toKey);
     if (fromNode || toNode) setRoutingMarkers(_map, fromNode && fromNode.coord, toNode && toNode.coord);
 
+    if (_viaCoord) {
+      const viaRoute = buildViaRoute();
+      if (!viaRoute) {
+        if (hadRoute) window.__routingHasRoute = true;
+        return;
+      }
+      _alternatives = [viaRoute];
+      _selectedIdx = 0;
+      window.__routingHasRoute = true;
+      renderRoute();
+      return;
+    }
+
     _alternatives = findAlternatives(_graph, _fromKey, _toKey);
 
-    if (!_alternatives.length) { clearRoutingMarkers(); showToast('No route found between these points.'); return; }
+    if (!_alternatives.length) {
+      clearRoutingMarkers();
+      showToast('No route found between these points.');
+      if (hadRoute) window.__routingHasRoute = true;
+      return;
+    }
 
     _alternatives = sortAlternativesByDistance(_alternatives);
     _selectedIdx = 0;
@@ -94,7 +152,7 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
     renderRoute();
   } catch (err) {
     console.error('Route computation failed', err);
-    window.__routingHasRoute = false;
+    if (hadRoute) window.__routingHasRoute = true;
     showToast('Failed to compute route.');
   }
 }
@@ -137,6 +195,25 @@ function sortAlternativesByDistance(routes) {
     .map((entry) => entry.route);
 }
 
+function buildViaRoute() {
+  if (!_graph || !_viaCoord || !_fromKey || !_toKey) return null;
+  const viaKey = snapToNode(_graph, _viaCoord);
+  if (!viaKey) {
+    showToast('No trail nearby at pass-through point.');
+    return null;
+  }
+  _viaKey = viaKey;
+  const viaNode = _graph.nodes.get(viaKey);
+  if (viaNode) setViaMarker(_map, viaNode.coord);
+  const leg1 = dijkstra(_graph, _fromKey, viaKey);
+  const leg2 = dijkstra(_graph, viaKey, _toKey);
+  if (!leg1 || !leg2) {
+    showToast('No route found through pass-through point.');
+    return null;
+  }
+  return [...leg1, ...leg2];
+}
+
 function showRoutePanel() {
   bumpPanelToken();
   const panel = document.getElementById('panel');
@@ -145,22 +222,44 @@ function showRoutePanel() {
 
   const selected = _alternatives[_selectedIdx];
   const distKm = routeDistanceKm(selected).toFixed(1);
+  const viaActive = !!_viaCoord;
+  const roundtripDisabled = viaActive ? 'disabled' : '';
+  const roundtripTitle = viaActive ? 'Disable pass-through to enable round trip.' : '';
 
-  const altItems = _alternatives.map((route, i) => {
-    const d = routeDistanceKm(route).toFixed(1);
-    return `<li class="route-alt-item${i === _selectedIdx ? ' route-alt-selected' : ''}" data-idx="${i}">
-      ${i === 0 ? 'Shortest' : `Alternative ${i}`} — ${d} km
-    </li>`;
-  }).join('');
+  const altItems = _alternatives.length > 1
+    ? _alternatives.map((route, i) => {
+      const d = routeDistanceKm(route).toFixed(1);
+      return `<li class="route-alt-item${i === _selectedIdx ? ' route-alt-selected' : ''}" data-idx="${i}">
+        ${i === 0 ? 'Shortest' : `Alternative ${i}`} — ${d} km
+      </li>`;
+    }).join('')
+    : '';
+
+  const altSection = _alternatives.length > 1
+    ? `<ul class="route-alt-list">${altItems}</ul>`
+    : `<p class="route-alt-empty">No alternatives for this route.</p>`;
+
+  const viaButtonLabel = viaActive ? '✏️ Edit pass-through' : '📍 Pass through a point';
+  const viaClearButton = viaActive
+    ? '<button id="route-via-clear" class="offline-btn">Clear</button>'
+    : '';
+  const viaNote = viaActive
+    ? '<p class="route-via-note">Pass-through point active.</p>'
+    : '';
 
   panel.innerHTML = `
     <button id="panel-close" class="panel-close-btn" aria-label="Close">×</button>
     <h2>Route</h2>
     <p class="route-distance">${distKm} km</p>
-    <label class="route-roundtrip-label">
-      <input type="checkbox" id="route-roundtrip"> 🔄 Round trip
+    <label class="route-roundtrip-label" title="${roundtripTitle}">
+      <input type="checkbox" id="route-roundtrip" ${roundtripDisabled}> 🔄 Round trip
     </label>
-    <ul class="route-alt-list">${altItems}</ul>
+    <div class="route-via-row">
+      <button id="route-via-btn" class="offline-btn">${viaButtonLabel}</button>
+      ${viaClearButton}
+    </div>
+    ${viaNote}
+    ${altSection}
     <div class="route-actions">
       <button id="route-download-gpx" class="offline-btn">⬇ Download GPX</button>
       <button id="routing-cancel-btn" class="offline-btn">✕ Cancel</button>
@@ -172,6 +271,7 @@ function showRoutePanel() {
   });
 
   panel.querySelector('#route-roundtrip').addEventListener('change', (e) => {
+    if (viaActive) return;
     if (e.target.checked) {
       const result = findRoundTrip(_graph, _fromKey, _toKey);
       if (!result) return;
@@ -183,11 +283,34 @@ function showRoutePanel() {
     }
   });
 
-  panel.querySelector('.route-alt-list').addEventListener('click', (e) => {
-    const item = e.target.closest('.route-alt-item');
-    if (!item) return;
-    selectRoute(parseInt(item.dataset.idx, 10));
+  const altList = panel.querySelector('.route-alt-list');
+  if (altList) {
+    altList.addEventListener('click', (e) => {
+      const item = e.target.closest('.route-alt-item');
+      if (!item) return;
+      selectRoute(parseInt(item.dataset.idx, 10));
+    });
+  }
+
+  panel.querySelector('#route-via-btn').addEventListener('click', () => {
+    if (!_startCoord || !_endCoord) return;
+    cancelViaMode(_map);
+    startViaMode(_map, (coord) => {
+      _viaCoord = coord;
+      computeAndDisplayRoute(_startCoord, _endCoord);
+    });
   });
+
+  const viaClear = panel.querySelector('#route-via-clear');
+  if (viaClear) {
+    viaClear.addEventListener('click', () => {
+      _viaCoord = null;
+      _viaKey = null;
+      clearViaMarker();
+      cancelViaMode(_map);
+      if (_startCoord && _endCoord) computeAndDisplayRoute(_startCoord, _endCoord);
+    });
+  }
 
   panel.querySelector('#route-download-gpx').addEventListener('click', () => {
     const gpx = generateGpx(_alternatives[_selectedIdx], 'Mountain Route');
@@ -198,6 +321,10 @@ function showRoutePanel() {
     clearRouteHighlight(_map);
     clearRoutingMarkers();
     cancelRoutingMode(_map);
+    cancelViaMode(_map);
+    clearViaMarker();
+    _viaCoord = null;
+    _viaKey = null;
     window.__routingHasRoute = false;
     document.body.classList.remove('panel-open');
   });
