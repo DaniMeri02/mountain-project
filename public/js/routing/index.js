@@ -25,12 +25,14 @@ let _startCoord = null;
 let _endCoord = null;
 let _viaCoord = null;
 let _viaKey = null;
+let _viaUiAttached = false;
 
 export function initRoutingModule(map) {
   _map = map;
   injectDrawerSection();
   attachFindRouteButton();
   attachAltClickHandler();
+  attachViaUiHandlers();
 }
 
 function injectDrawerSection() {
@@ -223,8 +225,11 @@ function showRoutePanel() {
   const selected = _alternatives[_selectedIdx];
   const distKm = routeDistanceKm(selected).toFixed(1);
   const viaActive = !!_viaCoord;
-  const roundtripDisabled = viaActive ? 'disabled' : '';
-  const roundtripTitle = viaActive ? 'Disable pass-through to enable round trip.' : '';
+  const viaPicking = !!window.__routingViaMode;
+  const roundtripDisabled = (viaActive || viaPicking) ? 'disabled' : '';
+  const roundtripTitle = viaPicking
+    ? 'Finish or cancel pass-through selection to enable round trip.'
+    : (viaActive ? 'Disable pass-through to enable round trip.' : '');
 
   const altItems = _alternatives.length > 1
     ? _alternatives.map((route, i) => {
@@ -239,13 +244,26 @@ function showRoutePanel() {
     ? `<ul class="route-alt-list">${altItems}</ul>`
     : `<p class="route-alt-empty">No alternatives for this route.</p>`;
 
-  const viaButtonLabel = viaActive ? '✏️ Edit pass-through' : '📍 Pass through a point';
-  const viaClearButton = viaActive
-    ? '<button id="route-via-clear" class="offline-btn">Clear</button>'
+  const viaButtonLabel = viaActive ? 'Change pass-through' : 'Add pass-through';
+  const viaPrimaryButton = viaPicking
+    ? ''
+    : `<button id="route-via-btn" class="offline-btn route-via-btn">${viaButtonLabel}</button>`;
+  const viaClearButton = viaActive && !viaPicking
+    ? '<button id="route-via-clear" class="offline-btn route-via-btn">Clear</button>'
     : '';
-  const viaNote = viaActive
-    ? '<p class="route-via-note">Pass-through point active.</p>'
+  const viaCancelButton = viaPicking
+    ? '<button id="route-via-cancel" class="offline-btn route-via-btn route-via-btn-cancel">Cancel selection</button>'
     : '';
+  const viaNote = viaPicking
+    ? 'Click on the map to set the pass-through point.'
+    : (viaActive ? 'Pass-through point active.' : 'Add a mandatory waypoint to shape the route.');
+  const viaStatusClass = viaPicking
+    ? 'route-via-status is-picking'
+    : (viaActive ? 'route-via-status is-active' : 'route-via-status');
+  const viaStatusText = viaPicking ? 'Selecting' : (viaActive ? 'Active' : 'Not set');
+  const viaCardClass = viaPicking
+    ? 'route-via-card is-picking'
+    : (viaActive ? 'route-via-card is-active' : 'route-via-card');
 
   panel.innerHTML = `
     <button id="panel-close" class="panel-close-btn" aria-label="Close">×</button>
@@ -254,11 +272,18 @@ function showRoutePanel() {
     <label class="route-roundtrip-label" title="${roundtripTitle}">
       <input type="checkbox" id="route-roundtrip" ${roundtripDisabled}> 🔄 Round trip
     </label>
-    <div class="route-via-row">
-      <button id="route-via-btn" class="offline-btn">${viaButtonLabel}</button>
-      ${viaClearButton}
+    <div class="${viaCardClass}">
+      <div class="route-via-header">
+        <span class="route-via-title">Pass-through point</span>
+        <span class="${viaStatusClass}">${viaStatusText}</span>
+      </div>
+      <p class="route-via-note">${viaNote}</p>
+      <div class="route-via-actions">
+        ${viaPrimaryButton}
+        ${viaClearButton}
+        ${viaCancelButton}
+      </div>
     </div>
-    ${viaNote}
     ${altSection}
     <div class="route-actions">
       <button id="route-download-gpx" class="offline-btn">⬇ Download GPX</button>
@@ -271,7 +296,7 @@ function showRoutePanel() {
   });
 
   panel.querySelector('#route-roundtrip').addEventListener('change', (e) => {
-    if (viaActive) return;
+    if (viaActive || viaPicking) return;
     if (e.target.checked) {
       const result = findRoundTrip(_graph, _fromKey, _toKey);
       if (!result) return;
@@ -292,14 +317,18 @@ function showRoutePanel() {
     });
   }
 
-  panel.querySelector('#route-via-btn').addEventListener('click', () => {
-    if (!_startCoord || !_endCoord) return;
-    cancelViaMode(_map);
-    startViaMode(_map, (coord) => {
-      _viaCoord = coord;
-      computeAndDisplayRoute(_startCoord, _endCoord);
+  const viaBtn = panel.querySelector('#route-via-btn');
+  if (viaBtn) {
+    viaBtn.addEventListener('click', () => {
+      if (!_startCoord || !_endCoord) return;
+      cancelViaMode(_map);
+      startViaMode(_map, (coord) => {
+        _viaCoord = coord;
+        computeAndDisplayRoute(_startCoord, _endCoord);
+      });
+      showRoutePanel();
     });
-  });
+  }
 
   const viaClear = panel.querySelector('#route-via-clear');
   if (viaClear) {
@@ -309,6 +338,14 @@ function showRoutePanel() {
       clearViaMarker();
       cancelViaMode(_map);
       if (_startCoord && _endCoord) computeAndDisplayRoute(_startCoord, _endCoord);
+    });
+  }
+
+  const viaCancel = panel.querySelector('#route-via-cancel');
+  if (viaCancel) {
+    viaCancel.addEventListener('click', () => {
+      cancelViaMode(_map);
+      showRoutePanel();
     });
   }
 
@@ -361,4 +398,15 @@ function showToast(msg) {
   const host = document.getElementById('map-container') || document.body;
   host.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
+}
+
+function attachViaUiHandlers() {
+  if (_viaUiAttached) return;
+  window.addEventListener('routing:via-start', () => {
+    if (document.body.classList.contains('panel-open')) showRoutePanel();
+  });
+  window.addEventListener('routing:via-cancel', () => {
+    if (document.body.classList.contains('panel-open')) showRoutePanel();
+  });
+  _viaUiAttached = true;
 }

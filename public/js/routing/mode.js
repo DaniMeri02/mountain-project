@@ -66,6 +66,7 @@ export function startViaMode(map, onPoint) {
   window.__routingViaMode = true;
   map.getCanvas().style.cursor = 'crosshair';
   showHint('Click pass-through point');
+  window.dispatchEvent(new Event('routing:via-start'));
 
   _viaClickHandler = (e) => {
     const coord = [e.lngLat.lng, e.lngLat.lat];
@@ -93,6 +94,7 @@ export function cancelViaMode(map) {
   if (_viaClickHandler) { map.off('click', _viaClickHandler); _viaClickHandler = null; }
   if (_viaKeyHandler) { document.removeEventListener('keydown', _viaKeyHandler); _viaKeyHandler = null; }
   hideHint();
+  window.dispatchEvent(new Event('routing:via-cancel'));
 }
 
 export function setRoutingMarkers(map, startCoord, endCoord) {
