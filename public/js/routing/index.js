@@ -421,8 +421,42 @@ function showRoutePanel() {
     _viaCoord = null;
     _viaKey = null;
     window.__routingHasRoute = false;
+    syncReopenButton();
+    showNewRoutePanel();
+  });
+}
+
+function showNewRoutePanel() {
+  bumpPanelToken();
+  const panel = document.getElementById('panel');
+  if (!panel) return;
+  document.body.classList.add('panel-open');
+  _panelUserClosed = false;
+
+  panel.innerHTML = `
+    <button id="panel-close" class="panel-close-btn" aria-label="Close">×</button>
+    <h2>Route</h2>
+    <p class="route-alt-empty">Pick start and end points on the map.</p>
+    <div class="route-actions">
+      <button id="route-new-btn" class="offline-btn routing-btn">🧭 New Route</button>
+    </div>
+  `;
+
+  panel.querySelector('#panel-close').addEventListener('click', () => {
+    _panelUserClosed = true;
     document.body.classList.remove('panel-open');
     syncReopenButton();
+  });
+
+  panel.querySelector('#route-new-btn').addEventListener('click', () => {
+    document.body.classList.remove('panel-open');
+    cancelViaMode(_map);
+    clearViaMarker();
+    _viaCoord = null;
+    _viaKey = null;
+    startRoutingMode(_map, async (startCoord, endCoord) => {
+      await computeAndDisplayRoute(startCoord, endCoord);
+    });
   });
 }
 
