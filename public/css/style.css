@@ -797,6 +797,30 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
   box-shadow: none;
 }
 
+#route-new-btn {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  text-align: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(46, 125, 50, 0.25);
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+#route-new-btn:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 3px 8px rgba(46, 125, 50, 0.35);
+  transform: translateY(-1px);
+}
+#route-new-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 #routing-cancel-btn {
   background: #fff;
   color: #b91c1c;
