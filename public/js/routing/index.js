@@ -1,4 +1,4 @@
-import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra } from './graph.js';
+import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute } from './graph.js';
 import { generateGpx, downloadGpx } from './gpx.js';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight.js';
 import {
@@ -36,6 +36,37 @@ export function initRoutingModule(map) {
   attachAltClickHandler();
   attachViaUiHandlers();
   createReopenButton();
+  window.__debugRoute = async (startCoord, endCoord) => {
+    await computeAndDisplayRoute(startCoord, endCoord);
+    if (!_graph) return { error: 'no graph' };
+    const fromNode = _graph.nodes.get(_fromKey);
+    const toNode = _graph.nodes.get(_toKey);
+    const compSizes = new Map();
+    for (const node of _graph.nodes.values()) compSizes.set(node.componentSize, (compSizes.get(node.componentSize) || 0) + 1);
+    return {
+      nodes: _graph.nodes.size, edges: _graph.edges.length,
+      fromKey: _fromKey, toKey: _toKey,
+      fromCoord: fromNode?.coord, toCoord: toNode?.coord,
+      fromCompSize: fromNode?.componentSize, toCompSize: toNode?.componentSize,
+      sameComp: fromNode && toNode && fromNode.componentSize === toNode.componentSize,
+      altsFound: _alternatives.length,
+      altDistances: _alternatives.map(alt => { let d=0; for(const {coords,reversed} of alt){const seg=reversed?[...coords].reverse():coords;for(let i=1;i<seg.length;i++){const[lg1,la1]=seg[i-1],[lg2,la2]=seg[i];const dLat=(la2-la1)*Math.PI/180,dLng=(lg2-lg1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLng/2)**2;d+=6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}}return Math.round(d); }),
+      compDistribution: Object.fromEntries([...compSizes].sort((a,b)=>b[0]-a[0]).slice(0,8)),
+    };
+  };
+  window.__debugGaps = (compSizeA, compSizeB) => {
+    if (!_graph) return 'no graph';
+    const nodesA = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeA);
+    const nodesB = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeB);
+    let minDist = Infinity, bestA = null, bestB = null;
+    for (const a of nodesA) {
+      for (const b of nodesB) {
+        const d = haversineMeters(a.coord, b.coord);
+        if (d < minDist) { minDist = d; bestA = a.coord; bestB = b.coord; }
+      }
+    }
+    return { minGapMeters: Math.round(minDist), coordA: bestA, coordB: bestB };
+  };
 }
 
 function injectDrawerSection() {
@@ -111,35 +142,39 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
       if (hadRoute) window.__routingHasRoute = true;
       return;
     }
-    _fromKey = snapToNode(_graph, startCoord);
-    _toKey = snapToNode(_graph, endCoord);
+    let best = findBestSnappedRoute(_graph, startCoord, endCoord, { maxMeters: 300, candidateLimit: 6 });
 
-    if (!_fromKey) {
+    if (!best.startCandidates.length) {
       clearRoutingMarkers();
       showToast('No trail nearby — click closer to a trail.');
       if (hadRoute) window.__routingHasRoute = true;
       return;
     }
-    if (!_toKey) {
+    if (!best.endCandidates.length) {
       clearRoutingMarkers();
       showToast('No trail nearby at end point — click closer to a trail.');
       if (hadRoute) window.__routingHasRoute = true;
       return;
     }
 
-    // If snapped nodes are in different components, retry preferring larger components.
-    // Prevents small orphan stubs (parking paths, short trails) from trapping the snap.
-    const fromNode0 = _graph.nodes.get(_fromKey);
-    const toNode0 = _graph.nodes.get(_toKey);
-    if (fromNode0 && toNode0 && fromNode0.componentSize !== toNode0.componentSize) {
+    // If no path was found, retry by preferring larger components.
+    if (!best.path) {
       let maxComp = 0;
       for (const n of _graph.nodes.values()) if (n.componentSize > maxComp) maxComp = n.componentSize;
       const minComp = Math.max(10, Math.floor(maxComp * 0.05));
-      const retryFrom = snapToNode(_graph, startCoord, 500, minComp);
-      const retryTo = snapToNode(_graph, endCoord, 500, minComp);
-      if (retryFrom) _fromKey = retryFrom;
-      if (retryTo) _toKey = retryTo;
+      const retry = findBestSnappedRoute(_graph, startCoord, endCoord, { maxMeters: 500, candidateLimit: 6, minComponentSize: minComp });
+      if (retry.path) best = retry;
     }
+
+    if (!best.path || !best.fromKey || !best.toKey) {
+      clearRoutingMarkers();
+      showToast('No route found between these points.');
+      if (hadRoute) window.__routingHasRoute = true;
+      return;
+    }
+
+    _fromKey = best.fromKey;
+    _toKey = best.toKey;
 
     const fromNode = _graph.nodes.get(_fromKey);
     const toNode = _graph.nodes.get(_toKey);

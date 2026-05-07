@@ -115,6 +115,68 @@ export function buildGraph(features) {
     node.componentSize = compSizes.get(ufFind(key)) || 1;
   }
 
+  // Gap-bridging: connect large disconnected components that are nearly adjacent.
+  // Uses spatial bucketing — checks ALL nodes (not just endpoints), handles loop trails.
+  const BRIDGE_MAX_METERS = 50;
+  const BRIDGE_MIN_COMP_SIZE = 20;
+  const BRIDGE_BUCKET_DEG = 0.0005; // ~55m per bucket at alpine latitudes
+
+  const compNodeLists = new Map();
+  for (const [key, node] of nodes) {
+    const root = ufFind(key);
+    if ((compSizes.get(root) || 1) < BRIDGE_MIN_COMP_SIZE) continue;
+    if (!compNodeLists.has(root)) compNodeLists.set(root, []);
+    compNodeLists.get(root).push([key, node]);
+  }
+
+  const bridgeRoots = [...compNodeLists.keys()];
+  for (let i = 0; i < bridgeRoots.length; i++) {
+    for (let j = i + 1; j < bridgeRoots.length; j++) {
+      const listA = compNodeLists.get(bridgeRoots[i]);
+      const listB = compNodeLists.get(bridgeRoots[j]);
+
+      // Build spatial bucket for B — O(|B|)
+      const bucketB = new Map();
+      for (const [keyB, nodeB] of listB) {
+        const bx = Math.floor(nodeB.coord[0] / BRIDGE_BUCKET_DEG);
+        const by = Math.floor(nodeB.coord[1] / BRIDGE_BUCKET_DEG);
+        const bk = `${bx}_${by}`;
+        if (!bucketB.has(bk)) bucketB.set(bk, []);
+        bucketB.get(bk).push([keyB, nodeB]);
+      }
+
+      // For each node in A, check adjacent buckets in B — O(|A| × avg_density)
+      let minDist = Infinity, bestKeyA = null, bestKeyB = null;
+      for (const [keyA, nodeA] of listA) {
+        const ax = Math.floor(nodeA.coord[0] / BRIDGE_BUCKET_DEG);
+        const ay = Math.floor(nodeA.coord[1] / BRIDGE_BUCKET_DEG);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const cands = bucketB.get(`${ax + dx}_${ay + dy}`);
+            if (!cands) continue;
+            for (const [keyB, nodeB] of cands) {
+              const d = haversineMeters(nodeA.coord, nodeB.coord);
+              if (d < minDist) { minDist = d; bestKeyA = keyA; bestKeyB = keyB; }
+            }
+          }
+        }
+      }
+
+      if (bestKeyA && minDist <= BRIDGE_MAX_METERS) {
+        const idx = edges.length;
+        edges.push({
+          featureId: '__bridge__',
+          segmentCoords: [nodes.get(bestKeyA).coord, nodes.get(bestKeyB).coord],
+          from: bestKeyA,
+          to: bestKeyB,
+          weight: minDist
+        });
+        nodes.get(bestKeyA).edgeIndices.push(idx);
+        nodes.get(bestKeyB).edgeIndices.push(idx);
+      }
+    }
+  }
+
   return { nodes, edges };
 }
 
@@ -132,6 +194,18 @@ export function snapToNode(graph, coord, maxMeters = 300, minComponentSize = 0) 
   }
   if (bestDist <= maxMeters) return bestKey;
   return null;
+}
+
+// Returns nearest nodes (sorted by distance) within maxMeters.
+export function nearestNodes(graph, coord, maxMeters = 300, limit = 6, minComponentSize = 0) {
+  const candidates = [];
+  for (const [key, node] of graph.nodes) {
+    if (node.componentSize < minComponentSize) continue;
+    const d = haversineMeters(coord, node.coord);
+    if (d <= maxMeters) candidates.push({ key, distance: d });
+  }
+  candidates.sort((a, b) => a.distance - b.distance);
+  return candidates.slice(0, limit);
 }
 
 // Binary min-heap — stores [cost, nodeKey] entries, ordered by cost
@@ -211,6 +285,65 @@ export function dijkstra(graph, fromKey, toKey, penaltyByEdgeIndex = {}) {
     cur = reversed ? edge.to : edge.from;
   }
   return path.length > 0 ? path : null;
+}
+
+function pathDistanceMeters(graph, path) {
+  let total = 0;
+  for (const step of path) {
+    const edge = graph.edges[step.edgeIndex];
+    if (edge) total += edge.weight;
+  }
+  return total;
+}
+
+export function findBestSnappedRoute(graph, startCoord, endCoord, options = {}) {
+  const {
+    maxMeters = 300,
+    candidateLimit = 6,
+    minComponentSize = 0,
+  } = options;
+
+  const startCandidates = nearestNodes(graph, startCoord, maxMeters, candidateLimit, minComponentSize);
+  const endCandidates = nearestNodes(graph, endCoord, maxMeters, candidateLimit, minComponentSize);
+
+  if (!startCandidates.length || !endCandidates.length) {
+    return {
+      path: null,
+      fromKey: null,
+      toKey: null,
+      distance: null,
+      startCandidates,
+      endCandidates,
+    };
+  }
+
+  let bestPath = null;
+  let bestDist = Infinity;
+  let bestFrom = null;
+  let bestTo = null;
+
+  for (const start of startCandidates) {
+    for (const end of endCandidates) {
+      const path = dijkstra(graph, start.key, end.key);
+      if (!path) continue;
+      const dist = pathDistanceMeters(graph, path);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPath = path;
+        bestFrom = start.key;
+        bestTo = end.key;
+      }
+    }
+  }
+
+  return {
+    path: bestPath,
+    fromKey: bestFrom,
+    toKey: bestTo,
+    distance: Number.isFinite(bestDist) ? bestDist : null,
+    startCandidates,
+    endCandidates,
+  };
 }
 
 function sharedFraction(r1, r2) {
