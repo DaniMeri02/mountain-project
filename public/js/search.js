@@ -36,7 +36,7 @@ export async function initSearch(map) {
   }
 
   const PLACEHOLDER_TIERS = [
-    'Search huts, peaks, bivouacs, via ferrata',
+    'Search huts, peaks, bivouacs and via ferrata',
     'Search huts, peaks, bivouacs',
     'Search huts, peaks',
     'Search huts',
@@ -69,8 +69,8 @@ export async function initSearch(map) {
 
     const font = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
 
-    for (const text of PLACEHOLDER_TIERS) {
-      const candidate = text + ELLIPSIS;
+    for (let i = 0; i < PLACEHOLDER_TIERS.length; i++) {
+      const candidate = i === 0 ? PLACEHOLDER_TIERS[i] : PLACEHOLDER_TIERS[i] + ELLIPSIS;
       if (measureTextWidth(candidate, font) <= available) {
         if (searchBox.placeholder !== candidate) searchBox.placeholder = candidate;
         return;

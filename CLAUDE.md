@@ -178,3 +178,17 @@ tests/
 - `agent/types.ts` — all TypeScript types
 - `public/js/ui.js` — frontend panel and AI interaction
 - `public/js/offline.js` — offline area management
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`github.com/DaniMeri02/mountain-project`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
