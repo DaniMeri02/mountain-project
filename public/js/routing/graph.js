@@ -379,6 +379,33 @@ export function findAlternatives(graph, fromKey, toKey) {
   return results;
 }
 
+export function findViaAlternatives(graph, fromKey, viaKey, toKey) {
+  const leg1Alts = findAlternatives(graph, fromKey, viaKey);
+  const leg2Alts = findAlternatives(graph, viaKey, toKey);
+  if (!leg1Alts.length || !leg2Alts.length) return [];
+
+  const combos = [];
+  for (const l1 of leg1Alts) {
+    for (const l2 of leg2Alts) {
+      const combined = [...l1, ...l2];
+      const weight = combined.reduce((sum, e) => sum + graph.edges[e.edgeIndex].weight, 0);
+      combos.push({ path: combined, weight });
+    }
+  }
+
+  combos.sort((a, b) => a.weight - b.weight);
+
+  const kept = [];
+  for (const { path } of combos) {
+    if (kept.every(k => sharedFraction(k, path) < 0.7)) {
+      kept.push(path);
+      if (kept.length === 4) break;
+    }
+  }
+
+  return kept;
+}
+
 export function findRoundTrip(graph, fromKey, toKey) {
   const outbound = dijkstra(graph, fromKey, toKey);
   if (!outbound) return null;

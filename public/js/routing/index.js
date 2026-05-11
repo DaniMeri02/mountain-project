@@ -1,4 +1,4 @@
-import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute } from './graph.js';
+import { buildGraph, snapToNode, findAlternatives, findViaAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute } from './graph.js';
 import { generateGpx, downloadGpx } from './gpx.js';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight.js';
 import {
@@ -181,12 +181,12 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
     if (fromNode || toNode) setRoutingMarkers(_map, fromNode && fromNode.coord, toNode && toNode.coord);
 
     if (_viaCoord) {
-      const viaRoute = buildViaRoute();
-      if (!viaRoute) {
+      const viaRoutes = buildViaRoute();
+      if (!viaRoutes) {
         if (hadRoute) window.__routingHasRoute = true;
         return;
       }
-      _alternatives = [viaRoute];
+      _alternatives = viaRoutes;
       _selectedIdx = 0;
       window.__routingHasRoute = true;
       renderRoute();
@@ -263,13 +263,12 @@ function buildViaRoute() {
   _viaKey = viaKey;
   const viaNode = _graph.nodes.get(viaKey);
   if (viaNode) setViaMarker(_map, viaNode.coord);
-  const leg1 = dijkstra(_graph, _fromKey, viaKey);
-  const leg2 = dijkstra(_graph, viaKey, _toKey);
-  if (!leg1 || !leg2) {
+  const alts = findViaAlternatives(_graph, _fromKey, viaKey, _toKey);
+  if (!alts.length) {
     showToast('No route found through pass-through point.');
     return null;
   }
-  return [...leg1, ...leg2];
+  return alts;
 }
 
 function showRoutePanel() {
