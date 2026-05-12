@@ -367,6 +367,9 @@ export function addMapLayers(map) {
   if (!map.getSource('route-alt-src')) {
     map.addSource('route-alt-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   }
+  if (!map.getSource('route-arrow-src')) {
+    map.addSource('route-arrow-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
   if (!map.getLayer('route-alt')) {
     map.addLayer({
       id: 'route-alt',
@@ -394,6 +397,20 @@ export function addMapLayers(map) {
         'line-gap-width': 5,
         'line-opacity': 0.35,
         'line-blur': 0.5
+      }
+    });
+  }
+  if (!map.getLayer('route-arrows')) {
+    map.addLayer({
+      id: 'route-arrows',
+      type: 'symbol',
+      source: 'route-arrow-src',
+      layout: {
+        'icon-image': 'route-arrow',
+        'icon-rotate': ['get', 'bearing'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-size': 0.55
       }
     });
   }
