@@ -746,6 +746,50 @@ body.routing-active #routing-find-btn { background: #2e7d32; color: #fff; border
   background: #fecaca;
   border-color: #fca5a5;
 }
+.route-via-count {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.route-via-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.route-via-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+.route-via-list-label {
+  color: #1e3a8a;
+  font-weight: 500;
+}
+.route-via-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.route-via-remove:hover {
+  color: #ef4444;
+}
 
 .route-alt-list {
   list-style: none;

@@ -406,6 +406,91 @@ export function findViaAlternatives(graph, fromKey, viaKey, toKey) {
   return kept;
 }
 
+function permutations(arr) {
+  if (arr.length <= 1) return [arr];
+  const result = [];
+  for (let i = 0; i < arr.length; i++) {
+    const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+    for (const perm of permutations(rest)) result.push([arr[i], ...perm]);
+  }
+  return result;
+}
+
+function distMatrixKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function buildDistanceMatrix(graph, keys) {
+  const dist = new Map();
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const path = dijkstra(graph, keys[i], keys[j]);
+      const d = path ? pathDistanceMeters(graph, path) : Infinity;
+      dist.set(distMatrixKey(keys[i], keys[j]), d);
+    }
+  }
+  return dist;
+}
+
+function orderingDistance(distMatrix, fromKey, orderedViaKeys, toKey) {
+  let total = 0;
+  let prev = fromKey;
+  for (const k of orderedViaKeys) {
+    total += distMatrix.get(distMatrixKey(prev, k)) ?? Infinity;
+    prev = k;
+  }
+  total += distMatrix.get(distMatrixKey(prev, toKey)) ?? Infinity;
+  return total;
+}
+
+export function findOptimalOrdering(graph, fromKey, viaKeys, toKey) {
+  if (viaKeys.length === 0) return [];
+  if (viaKeys.length === 1) return viaKeys;
+  const allKeys = [fromKey, ...viaKeys, toKey];
+  const distMatrix = buildDistanceMatrix(graph, allKeys);
+  let bestOrder = viaKeys;
+  let bestDist = Infinity;
+  for (const perm of permutations(viaKeys)) {
+    const d = orderingDistance(distMatrix, fromKey, perm, toKey);
+    if (d < bestDist) { bestDist = d; bestOrder = perm; }
+  }
+  return bestOrder;
+}
+
+export function findMultiViaAlternatives(graph, fromKey, orderedViaKeys, toKey) {
+  const waypoints = [fromKey, ...orderedViaKeys, toKey];
+  const legAlts = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const alts = findAlternatives(graph, waypoints[i], waypoints[i + 1]);
+    if (!alts.length) return [];
+    legAlts.push(alts.slice(0, 2));
+  }
+
+  // cross-product all leg alternatives
+  let combos = [{ path: [], weight: 0 }];
+  for (const alts of legAlts) {
+    const next = [];
+    for (const combo of combos) {
+      for (const leg of alts) {
+        const combined = [...combo.path, ...leg];
+        const weight = combo.weight + leg.reduce((s, e) => s + graph.edges[e.edgeIndex].weight, 0);
+        next.push({ path: combined, weight });
+      }
+    }
+    combos = next;
+  }
+
+  combos.sort((a, b) => a.weight - b.weight);
+  const kept = [];
+  for (const { path } of combos) {
+    if (kept.every(k => sharedFraction(k, path) < 0.7)) {
+      kept.push(path);
+      if (kept.length === 4) break;
+    }
+  }
+  return kept;
+}
+
 export function findRoundTrip(graph, fromKey, toKey) {
   const outbound = dijkstra(graph, fromKey, toKey);
   if (!outbound) return null;

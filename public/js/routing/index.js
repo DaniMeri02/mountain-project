@@ -1,4 +1,4 @@
-import { buildGraph, snapToNode, findAlternatives, findViaAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute } from './graph.js';
+import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute, findOptimalOrdering, findMultiViaAlternatives } from './graph.js';
 import { generateGpx, downloadGpx } from './gpx.js';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight.js';
 import {
@@ -8,8 +8,9 @@ import {
   setRoutingMarkers,
   startViaMode,
   cancelViaMode,
-  setViaMarker,
-  clearViaMarker
+  addViaMarker,
+  removeViaMarkerAt,
+  clearViaMarkers
 } from './mode.js';
 import { closeNav } from '../nav.js';
 import { bumpPanelToken } from '../map.js';
@@ -23,8 +24,8 @@ let _selectedIdx = 0;
 let _altClickAttached = false;
 let _startCoord = null;
 let _endCoord = null;
-let _viaCoord = null;
-let _viaKey = null;
+let _viaCoords = [];
+let _viaKeys = [];
 let _viaUiAttached = false;
 let _panelUserClosed = false;
 let _reopenBtn = null;
@@ -88,9 +89,9 @@ function attachFindRouteButton() {
       clearRouteHighlight(_map);
       clearRoutingMarkers();
       cancelViaMode(_map);
-      clearViaMarker();
-      _viaCoord = null;
-      _viaKey = null;
+      clearViaMarkers();
+      _viaCoords = [];
+      _viaKeys = [];
       window.__routingHasRoute = false;
       document.body.classList.remove('panel-open');
       syncReopenButton();
@@ -98,9 +99,9 @@ function attachFindRouteButton() {
     }
     closeNav();
     cancelViaMode(_map);
-    clearViaMarker();
-    _viaCoord = null;
-    _viaKey = null;
+    clearViaMarkers();
+    _viaCoords = [];
+    _viaKeys = [];
     startRoutingMode(_map, async (startCoord, endCoord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
     });
@@ -180,8 +181,8 @@ async function computeAndDisplayRoute(startCoord, endCoord) {
     const toNode = _graph.nodes.get(_toKey);
     if (fromNode || toNode) setRoutingMarkers(_map, fromNode && fromNode.coord, toNode && toNode.coord);
 
-    if (_viaCoord) {
-      const viaRoutes = buildViaRoute();
+    if (_viaCoords.length > 0) {
+      const viaRoutes = buildMultiViaRoute();
       if (!viaRoutes) {
         if (hadRoute) window.__routingHasRoute = true;
         return;
@@ -253,19 +254,24 @@ function sortAlternativesByDistance(routes) {
     .map((entry) => entry.route);
 }
 
-function buildViaRoute() {
-  if (!_graph || !_viaCoord || !_fromKey || !_toKey) return null;
-  const viaKey = snapToNode(_graph, _viaCoord);
-  if (!viaKey) {
-    showToast('No trail nearby at pass-through point.');
-    return null;
+function buildMultiViaRoute() {
+  if (!_graph || !_viaCoords.length || !_fromKey || !_toKey) return null;
+  clearViaMarkers();
+  _viaKeys = [];
+  for (let i = 0; i < _viaCoords.length; i++) {
+    const key = snapToNode(_graph, _viaCoords[i]);
+    if (!key) {
+      showToast(`No trail nearby at pass-through point ${i + 1}.`);
+      return null;
+    }
+    _viaKeys.push(key);
+    const node = _graph.nodes.get(key);
+    if (node) addViaMarker(_map, node.coord);
   }
-  _viaKey = viaKey;
-  const viaNode = _graph.nodes.get(viaKey);
-  if (viaNode) setViaMarker(_map, viaNode.coord);
-  const alts = findViaAlternatives(_graph, _fromKey, viaKey, _toKey);
+  const orderedKeys = findOptimalOrdering(_graph, _fromKey, _viaKeys, _toKey);
+  const alts = findMultiViaAlternatives(_graph, _fromKey, orderedKeys, _toKey);
   if (!alts.length) {
-    showToast('No route found through pass-through point.');
+    showToast('No route found through all pass-through points.');
     return null;
   }
   return alts;
@@ -279,12 +285,12 @@ function showRoutePanel() {
 
   const selected = _alternatives[_selectedIdx];
   const distKm = routeDistanceKm(selected).toFixed(1);
-  const viaActive = !!_viaCoord;
+  const viaActive = _viaCoords.length > 0;
   const viaPicking = !!window.__routingViaMode;
   const roundtripDisabled = (viaActive || viaPicking) ? 'disabled' : '';
   const roundtripTitle = viaPicking
     ? 'Finish or cancel pass-through selection to enable round trip.'
-    : (viaActive ? 'Disable pass-through to enable round trip.' : '');
+    : (viaActive ? 'Disable pass-through points to enable round trip.' : '');
 
   const altItems = _alternatives.length > 1
     ? _alternatives.map((route, i) => {
@@ -299,26 +305,25 @@ function showRoutePanel() {
     ? `<ul class="route-alt-list">${altItems}</ul>`
     : `<p class="route-alt-empty">No alternatives for this route.</p>`;
 
-  const viaButtonLabel = viaActive ? 'Change pass-through' : 'Add pass-through';
-  const viaPrimaryButton = viaPicking
-    ? ''
-    : `<button id="route-via-btn" class="offline-btn route-via-btn">${viaButtonLabel}</button>`;
-  const viaClearButton = viaActive && !viaPicking
-    ? '<button id="route-via-clear" class="offline-btn route-via-btn">Clear</button>'
+  const viaListItems = _viaCoords.map((_, i) =>
+    `<li class="route-via-list-item">
+      <span class="route-via-list-label">Via ${i + 1}</span>
+      <button class="route-via-remove" data-idx="${i}" aria-label="Remove via ${i + 1}">✕</button>
+    </li>`
+  ).join('');
+
+  const viaListSection = viaActive
+    ? `<ul class="route-via-list">${viaListItems}</ul>`
     : '';
-  const viaCancelButton = viaPicking
-    ? '<button id="route-via-cancel" class="offline-btn route-via-btn route-via-btn-cancel">Cancel selection</button>'
-    : '';
+
+  const viaCardClass = viaPicking ? 'route-via-card is-picking' : (viaActive ? 'route-via-card is-active' : 'route-via-card');
+  const atMax = _viaCoords.length >= 4;
+  const viaAddBtn = viaPicking
+    ? `<button id="route-via-cancel" class="offline-btn route-via-btn route-via-btn-cancel">Cancel selection</button>`
+    : `<button id="route-via-add" class="offline-btn route-via-btn" ${atMax ? 'disabled title="Maximum 4 pass-through points"' : ''}>+ Add pass-through</button>`;
   const viaNote = viaPicking
     ? 'Click on the map to set the pass-through point.'
-    : (viaActive ? 'Pass-through point active.' : 'Add a mandatory waypoint to shape the route.');
-  const viaStatusClass = viaPicking
-    ? 'route-via-status is-picking'
-    : (viaActive ? 'route-via-status is-active' : 'route-via-status');
-  const viaStatusText = viaPicking ? 'Selecting' : (viaActive ? 'Active' : 'Not set');
-  const viaCardClass = viaPicking
-    ? 'route-via-card is-picking'
-    : (viaActive ? 'route-via-card is-active' : 'route-via-card');
+    : (viaActive ? `${_viaCoords.length} / 4 active — route passes through each.` : 'Add mandatory waypoints to shape the route.');
 
   panel.innerHTML = `
     <button id="panel-close" class="panel-close-btn" aria-label="Close">×</button>
@@ -329,14 +334,13 @@ function showRoutePanel() {
     </label>
     <div class="${viaCardClass}">
       <div class="route-via-header">
-        <span class="route-via-title">Pass-through point</span>
-        <span class="${viaStatusClass}">${viaStatusText}</span>
+        <span class="route-via-title">Pass-through points</span>
+        ${viaActive ? `<span class="route-via-count">${_viaCoords.length} / 4</span>` : ''}
       </div>
+      ${viaListSection}
       <p class="route-via-note">${viaNote}</p>
       <div class="route-via-actions">
-        ${viaPrimaryButton}
-        ${viaClearButton}
-        ${viaCancelButton}
+        ${viaAddBtn}
       </div>
     </div>
     ${altSection}
@@ -374,27 +378,16 @@ function showRoutePanel() {
     });
   }
 
-  const viaBtn = panel.querySelector('#route-via-btn');
-  if (viaBtn) {
-    viaBtn.addEventListener('click', () => {
-      if (!_startCoord || !_endCoord) return;
+  const viaAddBtnEl = panel.querySelector('#route-via-add');
+  if (viaAddBtnEl) {
+    viaAddBtnEl.addEventListener('click', () => {
+      if (!_startCoord || !_endCoord || _viaCoords.length >= 4) return;
       cancelViaMode(_map);
       startViaMode(_map, (coord) => {
-        _viaCoord = coord;
+        _viaCoords.push(coord);
         computeAndDisplayRoute(_startCoord, _endCoord);
       });
       showRoutePanel();
-    });
-  }
-
-  const viaClear = panel.querySelector('#route-via-clear');
-  if (viaClear) {
-    viaClear.addEventListener('click', () => {
-      _viaCoord = null;
-      _viaKey = null;
-      clearViaMarker();
-      cancelViaMode(_map);
-      if (_startCoord && _endCoord) computeAndDisplayRoute(_startCoord, _endCoord);
     });
   }
 
@@ -406,6 +399,17 @@ function showRoutePanel() {
     });
   }
 
+  panel.querySelectorAll('.route-via-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      if (!Number.isFinite(idx)) return;
+      _viaCoords.splice(idx, 1);
+      _viaKeys.splice(idx, 1);
+      removeViaMarkerAt(idx);
+      if (_startCoord && _endCoord) computeAndDisplayRoute(_startCoord, _endCoord);
+    });
+  });
+
   panel.querySelector('#route-download-gpx').addEventListener('click', () => {
     const gpx = generateGpx(_alternatives[_selectedIdx], 'Mountain Route');
     downloadGpx(gpx, 'route.gpx');
@@ -416,9 +420,8 @@ function showRoutePanel() {
     clearRoutingMarkers();
     cancelRoutingMode(_map);
     cancelViaMode(_map);
-    clearViaMarker();
-    _viaCoord = null;
-    _viaKey = null;
+    _viaCoords = [];
+    _viaKeys = [];
     window.__routingHasRoute = false;
     syncReopenButton();
     showNewRoutePanel();
@@ -450,9 +453,9 @@ function showNewRoutePanel() {
   panel.querySelector('#route-new-btn').addEventListener('click', () => {
     document.body.classList.remove('panel-open');
     cancelViaMode(_map);
-    clearViaMarker();
-    _viaCoord = null;
-    _viaKey = null;
+    clearViaMarkers();
+    _viaCoords = [];
+    _viaKeys = [];
     startRoutingMode(_map, async (startCoord, endCoord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
     });

@@ -7,7 +7,7 @@ let _hintTextEl = null;
 let _hintCancelBtn = null;
 let _startMarker = null;
 let _endMarker = null;
-let _viaMarker = null;
+let _viaMarkers = [];
 let _mapRef = null;
 
 function buildRouteMarker(className) {
@@ -70,11 +70,6 @@ export function startViaMode(map, onPoint) {
 
   _viaClickHandler = (e) => {
     const coord = [e.lngLat.lng, e.lngLat.lat];
-    if (!_viaMarker) {
-      _viaMarker = buildRouteMarker('route-point-via').setLngLat(coord).addTo(map);
-    } else {
-      _viaMarker.setLngLat(coord);
-    }
     cancelViaMode(map);
     onPoint(coord);
   };
@@ -108,23 +103,27 @@ export function setRoutingMarkers(map, startCoord, endCoord) {
   }
 }
 
-export function setViaMarker(map, coord) {
+export function addViaMarker(map, coord) {
   if (!coord) return;
-  if (!_viaMarker) {
-    _viaMarker = buildRouteMarker('route-point-via').setLngLat(coord).addTo(map);
-  } else {
-    _viaMarker.setLngLat(coord);
-  }
+  const marker = buildRouteMarker('route-point-via').setLngLat(coord).addTo(map);
+  _viaMarkers.push(marker);
 }
 
-export function clearViaMarker() {
-  if (_viaMarker) { _viaMarker.remove(); _viaMarker = null; }
+export function removeViaMarkerAt(idx) {
+  if (idx < 0 || idx >= _viaMarkers.length) return;
+  _viaMarkers[idx].remove();
+  _viaMarkers.splice(idx, 1);
+}
+
+export function clearViaMarkers() {
+  for (const m of _viaMarkers) m.remove();
+  _viaMarkers = [];
 }
 
 export function clearRoutingMarkers() {
   if (_startMarker) { _startMarker.remove(); _startMarker = null; }
   if (_endMarker) { _endMarker.remove(); _endMarker = null; }
-  if (_viaMarker) { _viaMarker.remove(); _viaMarker = null; }
+  clearViaMarkers();
 }
 
 function showHint(text) {
