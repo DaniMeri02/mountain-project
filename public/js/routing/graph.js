@@ -353,12 +353,12 @@ function sharedFraction(r1, r2) {
 }
 
 // Runs Dijkstra up to 4 times, penalizing already-used edges 8× to find diverging alternatives
-export function findAlternatives(graph, fromKey, toKey) {
-  const p1 = dijkstra(graph, fromKey, toKey);
+export function findAlternatives(graph, fromKey, toKey, basePenalty = {}) {
+  const p1 = dijkstra(graph, fromKey, toKey, basePenalty);
   if (!p1) return [];
   const results = [p1];
 
-  const pen1 = {};
+  const pen1 = { ...basePenalty };
   for (const e of p1) pen1[e.edgeIndex] = 8;
 
   const p2 = dijkstra(graph, fromKey, toKey, pen1);
@@ -443,7 +443,7 @@ function orderingDistance(distMatrix, fromKey, orderedViaKeys, toKey) {
   return total;
 }
 
-export function findOptimalOrdering(graph, fromKey, viaKeys, toKey) {
+function findOptimalOrdering(graph, fromKey, viaKeys, toKey) {
   if (viaKeys.length === 0) return [];
   if (viaKeys.length === 1) return viaKeys;
   const allKeys = [fromKey, ...viaKeys, toKey];
@@ -457,38 +457,143 @@ export function findOptimalOrdering(graph, fromKey, viaKeys, toKey) {
   return bestOrder;
 }
 
-export function findMultiViaAlternatives(graph, fromKey, orderedViaKeys, toKey) {
-  const waypoints = [fromKey, ...orderedViaKeys, toKey];
-  const legAlts = [];
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const alts = findAlternatives(graph, waypoints[i], waypoints[i + 1]);
-    if (!alts.length) return [];
-    legAlts.push(alts.slice(0, 2));
+function intraRouteDupFraction(path) {
+  const seen = new Set();
+  let dups = 0;
+  for (const e of path) {
+    if (seen.has(e.edgeIndex)) dups++;
+    else seen.add(e.edgeIndex);
   }
+  return path.length > 0 ? dups / path.length : 0;
+}
 
-  // cross-product all leg alternatives
-  let combos = [{ path: [], weight: 0 }];
-  for (const alts of legAlts) {
-    const next = [];
-    for (const combo of combos) {
-      for (const leg of alts) {
-        const combined = [...combo.path, ...leg];
-        const weight = combo.weight + leg.reduce((s, e) => s + graph.edges[e.edgeIndex].weight, 0);
-        next.push({ path: combined, weight });
-      }
+// Count how many consecutive via-point pairs are visited in "reverse" order
+// relative to the start→end axis. 0 = perfectly monotonic, 1 = fully reversed.
+function orderingInversionScore(graph, fromKey, orderedViaKeys, toKey) {
+  if (orderedViaKeys.length === 0) return 0;
+  const fromCoord = graph.nodes.get(fromKey)?.coord;
+  const toCoord = graph.nodes.get(toKey)?.coord;
+  if (!fromCoord || !toCoord) return 0;
+  const dx = toCoord[0] - fromCoord[0];
+  const dy = toCoord[1] - fromCoord[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return 0;
+  const project = ([lng, lat]) => ((lng - fromCoord[0]) * dx + (lat - fromCoord[1]) * dy) / lenSq;
+  const projs = orderedViaKeys.map(k => {
+    const coord = graph.nodes.get(k)?.coord;
+    return coord ? project(coord) : 0;
+  });
+  let inversions = 0;
+  for (let i = 0; i < projs.length - 1; i++) {
+    if (projs[i] > projs[i + 1]) inversions++;
+  }
+  return inversions / Math.max(1, projs.length - 1);
+}
+
+const MAX_DUP_FRACTION = 0.10;
+
+export function findMultiViaAlternatives(graph, fromKey, viaKeys, toKey) {
+  if (!viaKeys.length) return [];
+
+  const legAltLimit = 4;
+
+  // N≤3: try all orderings; N=4: distance heuristic picks one best ordering
+  const orderings = viaKeys.length <= 3
+    ? permutations(viaKeys)
+    : [findOptimalOrdering(graph, fromKey, viaKeys, toKey)];
+
+  const allResults = [];
+
+  for (const orderedVia of orderings) {
+    const waypoints = [fromKey, ...orderedVia, toKey];
+    const orderingResults = [];
+    const invScore = orderingInversionScore(graph, fromKey, orderedVia, toKey);
+
+    // Always include the raw shortest path for this ordering (no cross-leg penalties)
+    let basePath = [];
+    let baseWeight = 0;
+    let baseOk = true;
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const leg = dijkstra(graph, waypoints[i], waypoints[i + 1]);
+      if (!leg) { baseOk = false; break; }
+      basePath = basePath.concat(leg);
+      baseWeight += pathDistanceMeters(graph, leg);
     }
-    combos = next;
+    if (baseOk && basePath.length > 0) {
+      orderingResults.push({ path: basePath, weight: baseWeight, invScore });
+    }
+
+    const maxOrderingResults = 48;
+    const dfs = (legIdx, currentPath, currentWeight, usedEdges) => {
+      if (orderingResults.length >= maxOrderingResults) return;
+      if (legIdx === waypoints.length - 1) {
+        orderingResults.push({ path: currentPath, weight: currentWeight, invScore });
+        return;
+      }
+      const basePenalty = {};
+      for (const idx of usedEdges) basePenalty[idx] = 8;
+      const alts = findAlternatives(graph, waypoints[legIdx], waypoints[legIdx + 1], basePenalty);
+      if (!alts.length) return;
+      for (const leg of alts.slice(0, legAltLimit)) {
+        const legWeight = leg.reduce((s, e) => s + graph.edges[e.edgeIndex].weight, 0);
+        const nextEdges = new Set([...usedEdges, ...leg.map(e => e.edgeIndex)]);
+        dfs(legIdx + 1, [...currentPath, ...leg], currentWeight + legWeight, nextEdges);
+      }
+    };
+
+    dfs(0, [], 0, new Set());
+    allResults.push(...orderingResults);
   }
 
-  combos.sort((a, b) => a.weight - b.weight);
+  // sort by minimal edge reuse first, then by weight
+  const scored = allResults.map((r) => ({ ...r, dupFraction: intraRouteDupFraction(r.path) }));
+  scored.sort((a, b) => {
+    if (Math.abs(a.dupFraction - b.dupFraction) > 0.01) return a.dupFraction - b.dupFraction;
+    if (Math.abs(a.weight - b.weight) > 1) return a.weight - b.weight;
+    return a.invScore - b.invScore;
+  });
+
   const kept = [];
-  for (const { path } of combos) {
+  for (const { path, dupFraction } of scored) {
+    if (kept.length > 0 && dupFraction > MAX_DUP_FRACTION) continue;
     if (kept.every(k => sharedFraction(k, path) < 0.7)) {
       kept.push(path);
       if (kept.length === 4) break;
     }
   }
   return kept;
+}
+
+function cartesianProduct(lists) {
+  return lists.reduce((acc, cur) => acc.flatMap(a => cur.map(c => a.concat([c]))), [[]]);
+}
+
+export function findBestMultiViaAlternatives(graph, fromKey, viaKeyCandidates, toKey) {
+  if (!viaKeyCandidates.length) return { alts: [], viaKeys: [] };
+  const combos = cartesianProduct(viaKeyCandidates);
+  let best = null;
+
+  for (const combo of combos) {
+    const alts = findMultiViaAlternatives(graph, fromKey, combo, toKey);
+    if (!alts.length) continue;
+    const bestPath = alts[0];
+    const dupFraction = intraRouteDupFraction(bestPath);
+    const weight = pathDistanceMeters(graph, bestPath);
+
+    if (!best) {
+      best = { alts, combo, dupFraction, weight };
+      continue;
+    }
+
+    if (Math.abs(dupFraction - best.dupFraction) > 0.01) {
+      if (dupFraction < best.dupFraction) best = { alts, combo, dupFraction, weight };
+      continue;
+    }
+
+    if (weight < best.weight) best = { alts, combo, dupFraction, weight };
+  }
+
+  return best ? { alts: best.alts, viaKeys: best.combo } : { alts: [], viaKeys: [] };
 }
 
 export function findRoundTrip(graph, fromKey, toKey) {

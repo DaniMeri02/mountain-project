@@ -1,4 +1,4 @@
-import { buildGraph, snapToNode, findAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute, findOptimalOrdering, findMultiViaAlternatives } from './graph.js';
+import { buildGraph, snapToNode, nearestNodes, findAlternatives, findRoundTrip, haversineMeters, dijkstra, findBestSnappedRoute, findMultiViaAlternatives, findBestMultiViaAlternatives } from './graph.js';
 import { generateGpx, downloadGpx } from './gpx.js';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight.js';
 import {
@@ -257,24 +257,33 @@ function sortAlternativesByDistance(routes) {
 function buildMultiViaRoute() {
   if (!_graph || !_viaCoords.length || !_fromKey || !_toKey) return null;
   clearViaMarkers();
-  _viaKeys = [];
+  const candidateLimit = 4;
+  const viaCandidates = [];
+
   for (let i = 0; i < _viaCoords.length; i++) {
-    const key = snapToNode(_graph, _viaCoords[i]);
-    if (!key) {
+    const candidates = nearestNodes(_graph, _viaCoords[i], 300, candidateLimit)
+      .map(c => c.key)
+      .filter((key, idx, arr) => arr.indexOf(key) === idx);
+    if (!candidates.length) {
       showToast(`No trail nearby at pass-through point ${i + 1}.`);
       return null;
     }
-    _viaKeys.push(key);
-    const node = _graph.nodes.get(key);
-    if (node) addViaMarker(_map, node.coord);
+    viaCandidates.push(candidates);
   }
-  const orderedKeys = findOptimalOrdering(_graph, _fromKey, _viaKeys, _toKey);
-  const alts = findMultiViaAlternatives(_graph, _fromKey, orderedKeys, _toKey);
-  if (!alts.length) {
+
+  const result = findBestMultiViaAlternatives(_graph, _fromKey, viaCandidates, _toKey);
+  if (!result.alts.length || !result.viaKeys.length) {
     showToast('No route found through all pass-through points.');
     return null;
   }
-  return alts;
+
+  _viaKeys = result.viaKeys;
+  for (const key of _viaKeys) {
+    const node = _graph.nodes.get(key);
+    if (node) addViaMarker(_map, node.coord);
+  }
+
+  return result.alts;
 }
 
 function showRoutePanel() {
@@ -292,11 +301,12 @@ function showRoutePanel() {
     ? 'Finish or cancel pass-through selection to enable round trip.'
     : (viaActive ? 'Disable pass-through points to enable round trip.' : '');
 
+  const primaryLabel = viaActive ? 'Least overlap' : 'Shortest';
   const altItems = _alternatives.length > 1
     ? _alternatives.map((route, i) => {
       const d = routeDistanceKm(route).toFixed(1);
       return `<li class="route-alt-item${i === _selectedIdx ? ' route-alt-selected' : ''}" data-idx="${i}">
-        ${i === 0 ? 'Shortest' : `Alternative ${i}`} — ${d} km
+        ${i === 0 ? primaryLabel : `Alternative ${i}`} — ${d} km
       </li>`;
     }).join('')
     : '';
