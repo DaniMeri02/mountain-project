@@ -493,6 +493,7 @@ body.map-fullscreen #map-container {
   width: 20px;
   height: 30px;
   animation: map-click-glow-pulse 1.4s ease-in-out infinite;
+  cursor: pointer;
 }
 
 .map-click-ping::before {

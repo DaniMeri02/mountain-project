@@ -1,5 +1,5 @@
 import { loadIcons } from './icons.js';
-import { updatePanel, updateCoordinatesPanel } from './ui.js';
+import { updatePanel, updateCoordinatesPanel, closePanel } from './ui.js';
 import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation.js';
 
 // We store the current selection to know if 3D should be applied after a style loads
@@ -135,6 +135,14 @@ function upsertTransientClickMarker(map, coordinates, className = 'map-click-pin
     removeTransientClickMarker();
     const markerElement = document.createElement('div');
     markerElement.className = className;
+
+    if (className === 'map-click-ping') {
+      markerElement.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeTransientClickMarker();
+        closePanel();
+      });
+    }
 
     transientClickMarker = new mapboxgl.Marker({
       element: markerElement,
@@ -547,6 +555,13 @@ export function setupMapInteractivity(map) {
     }
 
     updateCoordinatesPanel(coordinates.lng, coordinates.lat, derivedElevation, false);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && transientClickMarker) {
+      removeTransientClickMarker();
+      closePanel();
+    }
   });
 
   // Listen to map pan/zoom events to dynamically fetch from PostGIS backend
