@@ -46,8 +46,19 @@ export async function initSearch(map) {
 
   let debounceTimer;
   let lastMatches = [];
+  let highlightedIndex = -1;
   let placeholderRaf = 0;
   let measureCanvas = null;
+
+  function setHighlight(index) {
+    const items = searchResults.children;
+    for (let i = 0; i < items.length; i++) items[i].classList.remove('active');
+    highlightedIndex = index;
+    if (index >= 0 && items[index]) {
+      items[index].classList.add('active');
+      items[index].scrollIntoView({ block: 'nearest' });
+    }
+  }
 
   function measureTextWidth(text, font) {
     if (!measureCanvas) measureCanvas = document.createElement('canvas');
@@ -168,6 +179,7 @@ export async function initSearch(map) {
         const matches = await res.json();
         if (!Array.isArray(matches)) throw new Error('Unexpected search response shape');
         lastMatches = matches;
+        highlightedIndex = -1;
 
         if (matches.length > 0) {
           searchResults.style.display = 'block';
@@ -194,8 +206,43 @@ export async function initSearch(map) {
               li.appendChild(metaEl);
             }
 
+            const itemIndex = lastMatches.indexOf(feat);
+            li.setAttribute('tabindex', '0');
+            li.setAttribute('role', 'option');
+
             li.addEventListener('click', () => {
               goToFeature(feat);
+            });
+
+            li.addEventListener('focus', () => {
+              setHighlight(itemIndex);
+            });
+
+            li.addEventListener('keydown', (e) => {
+              const total = lastMatches.length;
+              if ((e.key === 'ArrowDown') || (e.key === 'Tab' && !e.shiftKey)) {
+                e.preventDefault();
+                const next = highlightedIndex + 1;
+                if (next < total) {
+                  searchResults.children[next].focus();
+                }
+              } else if ((e.key === 'ArrowUp') || (e.key === 'Tab' && e.shiftKey)) {
+                e.preventDefault();
+                if (highlightedIndex > 0) {
+                  searchResults.children[highlightedIndex - 1].focus();
+                } else {
+                  setHighlight(-1);
+                  searchBox.focus();
+                }
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                goToFeature(feat);
+              } else if (e.key === 'Escape') {
+                searchResults.innerHTML = '';
+                searchResults.style.display = 'none';
+                highlightedIndex = -1;
+                searchBox.focus();
+              }
             });
 
             searchResults.appendChild(li);
@@ -208,9 +255,23 @@ export async function initSearch(map) {
   });
 
   searchBox.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && lastMatches.length > 0) {
+    const total = lastMatches.length;
+    if (total === 0) return;
+
+    if ((e.key === 'ArrowDown' || e.key === 'Tab') && !e.shiftKey) {
       e.preventDefault();
-      goToFeature(lastMatches[0]);
+      searchResults.children[0]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight(Math.max(highlightedIndex - 1, -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      goToFeature(lastMatches[highlightedIndex >= 0 ? highlightedIndex : 0]);
+    } else if (e.key === 'Escape') {
+      searchResults.innerHTML = '';
+      searchResults.style.display = 'none';
+      highlightedIndex = -1;
+      searchBox.blur();
     }
   });
 
@@ -218,6 +279,7 @@ export async function initSearch(map) {
   document.addEventListener('click', (e) => {
     if (!searchContainer.contains(e.target)) {
       searchResults.style.display = 'none';
+      highlightedIndex = -1;
     }
   });
 }

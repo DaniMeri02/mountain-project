@@ -179,6 +179,7 @@
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
   transition: background var(--transition);
+  outline: none;
 }
 #search-results li:hover,
 #search-results li.active {
