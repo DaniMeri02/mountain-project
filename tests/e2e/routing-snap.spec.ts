@@ -67,15 +67,17 @@ test('routing prefers the shortest snapped path', async ({ page }) => {
   await page.waitForFunction(() => Boolean((window as { __debugRoute?: unknown }).__debugRoute));
 
   const result = await page.evaluate(async () => {
-    const debugRoute = (window as { __debugRoute: (start: number[], end: number[]) => Promise<DebugRouteResult> }).__debugRoute;
+    const debugRoute = (window as unknown as { __debugRoute: (start: number[], end: number[]) => Promise<DebugRouteResult> }).__debugRoute;
     return debugRoute([9.0, 46.0], [9.001, 45.995]);
   });
 
   expect(result.error).toBeUndefined();
   expect(result.altsFound).toBeGreaterThan(0);
   expect(result.altDistances[0]).toBeLessThan(1000);
-  expect(result.fromCoord[0]).toBeCloseTo(9.001, 6);
-  expect(result.fromCoord[1]).toBeCloseTo(46.0, 6);
-  expect(result.toCoord[0]).toBeCloseTo(9.001, 6);
-  expect(result.toCoord[1]).toBeCloseTo(45.995, 6);
+  expect(result.fromCoord).toBeDefined();
+  expect(result.toCoord).toBeDefined();
+  expect(result.fromCoord![0]).toBeCloseTo(9.001, 6);
+  expect(result.fromCoord![1]).toBeCloseTo(46.0, 6);
+  expect(result.toCoord![0]).toBeCloseTo(9.001, 6);
+  expect(result.toCoord![1]).toBeCloseTo(45.995, 6);
 });
