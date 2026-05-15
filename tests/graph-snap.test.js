@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { buildGraph, snapToNode, dijkstra, findBestSnappedRoute } from '../public/js/routing/graph.js';
+import { buildGraph, snapToNode, dijkstra, findBestSnappedRoute } from '../src/routing/graph.ts';
 
 function makeLine(id, coords) {
   return {

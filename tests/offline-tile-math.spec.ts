@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-// @ts-expect-error — frontend ESM with no types, imported for unit math.
-import { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from '../public/js/tile-math.js';
+// @ts-expect-error — .ts extension import requires allowImportingTsExtensions; resolved by Vitest at runtime.
+import { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from '../src/tile-math.ts';
 
 // Val Masino-ish bbox (~25 km × 25 km in northern Lombardy).
-const VAL_MASINO_BBOX = [9.55, 46.16, 9.83, 46.36];
+const VAL_MASINO_BBOX: [number, number, number, number] = [9.55, 46.16, 9.83, 46.36];
 
 describe('tilesInBboxAtZoom', () => {
   it('returns a single tile at zoom 0', () => {

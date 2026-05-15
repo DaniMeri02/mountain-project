@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { buildGraph, snapToNode, dijkstra } from '../public/js/routing/graph.js';
+import { buildGraph, snapToNode, dijkstra } from '../src/routing/graph.ts';
 
 // Helpers to build GeoJSON LineString features
 function makeLine(id, coords) {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { buildGraph, snapToNode, findViaAlternatives, findMultiViaAlternatives, findBestMultiViaAlternatives, dijkstra } from '../public/js/routing/graph.js';
+import { buildGraph, snapToNode, findViaAlternatives, findMultiViaAlternatives, findBestMultiViaAlternatives, dijkstra } from '../src/routing/graph.ts';
 
 // Graph shape:
 //   A --[direct]--> B --[direct]--> C
