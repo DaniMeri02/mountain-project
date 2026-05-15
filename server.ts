@@ -486,10 +486,17 @@ fastify.get('/api/ai/models', async () => {
   return AI_MODELS.map(m => ({ slug: m.slug, label: m.label }));
 });
 
-// Register the plugin to serve static files from the 'public' folder
+// Register the plugin to serve static files
+// In production, __dirname is dist/ so path.join(__dirname, 'public') → dist/public/ (Vite output)
+// In dev, Vite dev server handles the frontend on :5173; serve ../public as a fallback
+const staticRoot =
+  process.env.NODE_ENV === 'production'
+    ? path.join(__dirname, 'public')
+    : path.join(__dirname, '../public');
+
 fastify.register(fastifyStatic, {
-  root: path.join(process.cwd(), 'public'),
-  prefix: '/', 
+  root: staticRoot,
+  prefix: '/',
 });
 
 fastify.addHook('onClose', async () => {

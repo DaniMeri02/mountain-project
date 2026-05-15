@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch server.ts",
+    "dev": "concurrently \"tsx watch server.ts\" \"vite\"",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
     "fetch:trails": "tsx scripts/fetch-trails.ts",
@@ -15,12 +15,14 @@
     "fetch:ferrata": "tsx scripts/fetch-via-ferrata.ts",
     "export:ferrata": "tsx scripts/export-via-ferrata.ts",
     "import:ferrata": "tsx scripts/import-via-ferrata.ts",
-    "build": "esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js",
+    "build": "npm run build:server && npm run build:frontend",
+    "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js",
+    "build:frontend": "vite build",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.frontend.json --noEmit"
   },
   "dependencies": {
     "@fastify/static": "^9.0.0",
