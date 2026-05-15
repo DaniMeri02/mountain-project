@@ -7,5 +7,7 @@ scripts/via-ferrata-failed-chunks.json
 agent-sources-dump.txt
 .claude/
 .playwright-mcp/
+.agents/
+skills-lock.json
 test-results/
 playwright-report/
