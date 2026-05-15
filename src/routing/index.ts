@@ -69,12 +69,7 @@ export function initRoutingModule(map: mapboxgl.Map): void {
         for (const { coords, reversed } of alt) {
           const seg = reversed ? [...coords].reverse() : coords;
           for (let i = 1; i < seg.length; i++) {
-            const [lg1, la1] = seg[i - 1];
-            const [lg2, la2] = seg[i];
-            const dLat = (la2 - la1) * Math.PI / 180;
-            const dLng = (lg2 - lg1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-            d += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            d += haversineMeters(seg[i - 1], seg[i]);
           }
         }
         return Math.round(d);

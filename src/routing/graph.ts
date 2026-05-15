@@ -76,7 +76,7 @@ function extractLineStrings(feature: RawFeature): unknown[][] {
   const geometry = feature && feature.geometry ? feature.geometry : null;
   if (!geometry || typeof geometry !== 'object') return [];
   const geom = geometry as { type?: string; coordinates?: unknown };
-  if (geom.type === 'LineString') return (geom.coordinates as unknown[][] | undefined) ?? [];
+  if (geom.type === 'LineString') return [(geom.coordinates as unknown[][] | undefined) ?? []];
   if (geom.type === 'MultiLineString') return (geom.coordinates as unknown[][] | undefined) ?? [];
   return [];
 }
