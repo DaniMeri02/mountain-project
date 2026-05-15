@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"tsx watch server.ts\" \"vite\"",
+    "dev": "concurrently --kill-others-on-fail \"tsx watch server.ts\" \"vite\"",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
     "fetch:trails": "tsx scripts/fetch-trails.ts",
