@@ -14,7 +14,7 @@ async function fireMapClick(
   lat: number,
 ): Promise<void> {
   await page.evaluate(({ lng, lat }) => {
-    const map = (window as unknown as { __debugMap: mapboxgl.Map }).__debugMap;
+    const map = (window as unknown as { __debugMap: { getCanvas(): HTMLCanvasElement; project(lnglat: [number,number]): {x:number;y:number}; on(e:string,h:unknown):void; _listeners: Record<string,(e:unknown)=>void[]> } }).__debugMap;
 
     // Craft a fake LngLat and point that satisfies the click handler.
     // The general 'click' handler uses e.lngLat.lng/lat and e.point (only
@@ -59,8 +59,8 @@ test.describe('map pin dismiss', () => {
     await page.waitForFunction(() => Boolean((window as unknown as { __debugMap?: unknown }).__debugMap));
     // Wait for map style to load so layers are registered
     await page.waitForFunction(() => {
-      const map = (window as unknown as { __debugMap: mapboxgl.Map }).__debugMap;
-      return map.isStyleLoaded();
+      const map = (window as unknown as { __debugMap?: { isStyleLoaded(): boolean } }).__debugMap;
+      return map?.isStyleLoaded() ?? false;
     });
   });
 

@@ -53,7 +53,7 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
   const searchContainer = searchContainerEl;
 
   const PLACEHOLDER_TIERS = [
-    'Search huts, peaks, bivouacs and via ferrata',
+    'Search huts, peaks, bivouacs, via ferrata',
     'Search huts, peaks, bivouacs',
     'Search huts, peaks',
     'Search huts',
@@ -98,7 +98,7 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
     const font = `${cs.fontStyle} ${cs.fontVariant} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
 
     for (let i = 0; i < PLACEHOLDER_TIERS.length; i++) {
-      const candidate = i === 0 ? PLACEHOLDER_TIERS[i] : PLACEHOLDER_TIERS[i] + ELLIPSIS;
+      const candidate = PLACEHOLDER_TIERS[i] + ELLIPSIS;
       if (measureTextWidth(candidate, font) <= available) {
         if (searchBox.placeholder !== candidate) searchBox.placeholder = candidate;
         return;
@@ -241,11 +241,13 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
                 e.preventDefault();
                 const next = highlightedIndex + 1;
                 if (next < total) {
+                  setHighlight(next);
                   (searchResults.children[next] as HTMLElement).focus();
                 }
               } else if ((e.key === 'ArrowUp') || (e.key === 'Tab' && e.shiftKey)) {
                 e.preventDefault();
                 if (highlightedIndex > 0) {
+                  setHighlight(highlightedIndex - 1);
                   (searchResults.children[highlightedIndex - 1] as HTMLElement).focus();
                 } else {
                   setHighlight(-1);
@@ -277,7 +279,9 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
 
     if ((e.key === 'ArrowDown' || e.key === 'Tab') && !e.shiftKey) {
       e.preventDefault();
-      (searchResults.children[0] as HTMLElement | undefined)?.focus();
+      const next = highlightedIndex < 0 ? 0 : Math.min(highlightedIndex + 1, total - 1);
+      setHighlight(next);
+      (searchResults.children[next] as HTMLElement | undefined)?.focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlight(Math.max(highlightedIndex - 1, -1));

@@ -60,6 +60,7 @@ const map = new mapboxgl.Map({
 });
 
 appState.map = map;
+(window as Window & { __debugMap?: mapboxgl.Map }).__debugMap = map;
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
 const geolocate = new mapboxgl.GeolocateControl({

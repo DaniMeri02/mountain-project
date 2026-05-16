@@ -10,7 +10,7 @@ async function openDrawer(page: Page) {
 
 async function getMapStyleInfo(page: Page) {
   return page.evaluate(() => {
-    const map = (window as unknown as { __map?: any }).__map;
+    const map = (window as unknown as { __debugMap?: any }).__debugMap;
     if (!map) return null;
     const style = map.getStyle();
     return {
@@ -52,7 +52,7 @@ test.describe('basemap drawer', () => {
 
   test('selecting OpenStreetMap switches map to OSM raster style', async ({ page }) => {
     await page.goto('/');
-    await page.waitForFunction(() => Boolean((window as unknown as { __map?: any }).__map));
+    await page.waitForFunction(() => Boolean((window as unknown as { __debugMap?: any }).__debugMap));
     // Wait for initial style.load
     await page.waitForTimeout(800);
 
@@ -62,7 +62,7 @@ test.describe('basemap drawer', () => {
     await page.waitForTimeout(1500);
 
     const info = await getMapStyleInfo(page);
-    expect(info, 'window.__map missing').not.toBeNull();
+    expect(info, 'window.__debugMap missing').not.toBeNull();
     expect(info!.sources, 'osm source not present').toContain('osm');
     expect(info!.layerIds, 'osm-raster layer not present').toContain('osm-raster');
 
@@ -71,7 +71,7 @@ test.describe('basemap drawer', () => {
 
   test('selecting TopoMap switches map to OpenTopo style', async ({ page }) => {
     await page.goto('/');
-    await page.waitForFunction(() => Boolean((window as unknown as { __map?: any }).__map));
+    await page.waitForFunction(() => Boolean((window as unknown as { __debugMap?: any }).__debugMap));
     await page.waitForTimeout(800);
 
     await openDrawer(page);
@@ -92,7 +92,7 @@ test.describe('basemap drawer', () => {
     });
 
     await page.goto('/');
-    await page.waitForFunction(() => Boolean((window as unknown as { __map?: any }).__map));
+    await page.waitForFunction(() => Boolean((window as unknown as { __debugMap?: any }).__debugMap));
     await page.waitForTimeout(800);
 
     await openDrawer(page);
@@ -101,7 +101,7 @@ test.describe('basemap drawer', () => {
     await page.waitForTimeout(2000);
 
     const info = await getMapStyleInfo(page);
-    expect(info, 'window.__map missing').not.toBeNull();
+    expect(info, 'window.__debugMap missing').not.toBeNull();
     expect(info!.layerIds, 'pois-points layer missing on OSM').toContain('pois-points');
     expect(info!.layerIds, 'trails-lines layer missing on OSM').toContain('trails-lines');
     expect(info!.layerIds, 'ferrata-lines layer missing on OSM').toContain('ferrata-lines');

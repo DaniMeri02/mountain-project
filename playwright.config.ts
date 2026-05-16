@@ -11,6 +11,7 @@ export default defineConfig({
     headless: true,
     trace: 'off',
     screenshot: 'off',
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
