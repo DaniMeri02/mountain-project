@@ -69,6 +69,8 @@ describe('AiDescriptionCache', () => {
   });
 
   it('set() calls pool.query with ON CONFLICT DO UPDATE', async () => {
+    pool = makeMockPool([{ expires_at: new Date() }]);
+    cache = new AiDescriptionCache(pool);
     await cache.set('key1', 'Rifugio Test', 'hut', 'A description.', ['Wikidata']);
     const sql: string = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(sql).toContain('ON CONFLICT');
@@ -76,6 +78,8 @@ describe('AiDescriptionCache', () => {
   });
 
   it('set() serializes sources array as JSON string', async () => {
+    pool = makeMockPool([{ expires_at: new Date() }]);
+    cache = new AiDescriptionCache(pool);
     const sources = ['Wikidata', 'Komoot', 'YouTube'];
     await cache.set('key1', 'Test', 'peak', 'Desc', sources);
     const params: unknown[] = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0][1];
@@ -90,6 +94,8 @@ describe('AiDescriptionCache', () => {
   });
 
   it('sources survive JSON.stringify round-trip in set()', async () => {
+    pool = makeMockPool([{ expires_at: new Date() }]);
+    cache = new AiDescriptionCache(pool);
     const sources = ['Wikidata', 'Rifugi', 'Reddit'];
     await cache.set('k', 'N', 't', 'd', sources);
     const params: unknown[] = (pool.query as ReturnType<typeof vi.fn>).mock.calls[0][1];

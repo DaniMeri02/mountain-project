@@ -109,6 +109,13 @@ function renderAltitudeText(elevation: number | null | undefined, isLoading: boo
   return 'Not available';
 }
 
+/** Strips <script> tags and inline event handlers from AI-generated HTML before DOM injection. */
+function sanitizeAiHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '');
+}
+
 export function escapeHtml(str: string | null | undefined): string {
   if (str == null) return '';
   return String(str)
@@ -261,8 +268,7 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
       if (resultSection) resultSection.style.display = 'block';
 
       if (resultContent) {
-        // data.description is AI-generated HTML — intentional innerHTML usage
-        let html = data.description ?? '';
+        let html = sanitizeAiHtml(data.description ?? '');
         if (data.modelUsed) {
           html += `<p class="ai-model-used-note">🤖 Generato da: ${escapeHtml(data.modelUsed)}</p>`;
         }

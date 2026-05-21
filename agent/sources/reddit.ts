@@ -81,8 +81,9 @@ export async function fetchRedditPosts(input: AgentInput): Promise<SourceResult>
     const formatted = posts
       .map((post) => {
         const d = post.data;
-        const text = d.selftext.trim().substring(0, 300).replace(/\n/g, ' ');
-        const date = new Date(d.created_utc * 1000).toISOString().substring(0, 7);
+        const text = (d.selftext?.trim() ?? '').substring(0, 300).replace(/\n/g, ' ');
+        const utcMs = typeof d.created_utc === 'number' ? d.created_utc * 1000 : Date.now();
+        const date = new Date(utcMs).toISOString().substring(0, 7);
         return `• "${d.title}" (r/${d.subreddit}, score: ${d.score}, ${date})${text ? `\n  ${text}` : ''}`;
       })
       .join('\n\n');

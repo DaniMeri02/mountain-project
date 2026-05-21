@@ -182,7 +182,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/trails', async (request, reply) =>
     return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
     fastify.log.error(error);
-    reply.status(500).send({ error: 'Database query failed' });
+    return reply.status(500).send({ error: 'Database query failed' });
   }
 });
 
@@ -204,7 +204,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) =
     }
 
     fastify.log.error(error);
-    reply.status(500).send({ error: 'Database query failed' });
+    return reply.status(500).send({ error: 'Database query failed' });
   }
 });
 
@@ -221,7 +221,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/pois', async (request, reply) => {
     return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
     fastify.log.error(error);
-    reply.status(500).send({ error: 'Database query failed' });
+    return reply.status(500).send({ error: 'Database query failed' });
   }
 });
 
@@ -403,7 +403,7 @@ fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) 
     }
 
     fastify.log.error(error);
-    reply.status(500).send({ error: 'Search query failed' });
+    return reply.status(500).send({ error: 'Search query failed' });
   }
 });
 
@@ -426,8 +426,8 @@ const researchBodySchema = {
     properties: {
       name: { type: 'string', minLength: 1 },
       type: { type: 'string', minLength: 1 },
-      elevation: {},
-      osm_id: {},
+      elevation: { type: ['number', 'null'] },
+      osm_id: { type: ['string', 'integer', 'null'] },
       lat: { type: ['number', 'null'] },
       lng: { type: ['number', 'null'] },
       modelSlug: { type: ['string', 'null'] },
@@ -446,20 +446,36 @@ function getOrchestrator(): AgentOrchestrator {
   return orchestrator;
 }
 
+const VALID_MODEL_SLUGS = new Set(AI_MODELS.map((m) => m.slug));
+
+function resolveModelSlug(modelSlug: string | null | undefined, reply: { status: (n: number) => { send: (b: unknown) => unknown } }): string | undefined | null {
+  if (modelSlug == null) return undefined;
+  if (!VALID_MODEL_SLUGS.has(modelSlug)) {
+    reply.status(400).send({
+      error: 'Unknown modelSlug',
+      validSlugs: Array.from(VALID_MODEL_SLUGS),
+    });
+    return null;
+  }
+  return modelSlug;
+}
+
 fastify.post<{ Body: ResearchBody }>(
   '/api/ai/research',
   { schema: researchBodySchema },
   async (request, reply) => {
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
+    const resolvedSlug = resolveModelSlug(modelSlug, reply);
+    if (resolvedSlug === null) return;
     try {
       return await getOrchestrator().generate(
         { name, type: type as PoiType, elevation, osm_id, lat, lng },
         false,
-        modelSlug ?? undefined,
+        resolvedSlug,
       );
     } catch (error) {
       fastify.log.error(error);
-      reply.status(500).send({ error: 'AI generation failed. Check server logs.' });
+      return reply.status(500).send({ error: 'AI generation failed. Check server logs.' });
     }
   }
 );
@@ -469,21 +485,27 @@ fastify.post<{ Body: ResearchBody }>(
   { schema: researchBodySchema },
   async (request, reply) => {
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
+    const resolvedSlug = resolveModelSlug(modelSlug, reply);
+    if (resolvedSlug === null) return;
     try {
       return await getOrchestrator().generate(
         { name, type: type as PoiType, elevation, osm_id, lat, lng },
         true,
-        modelSlug ?? undefined,
+        resolvedSlug,
       );
     } catch (error) {
       fastify.log.error(error);
-      reply.status(500).send({ error: 'AI regeneration failed. Check server logs.' });
+      return reply.status(500).send({ error: 'AI regeneration failed. Check server logs.' });
     }
   }
 );
 
 fastify.get('/api/ai/models', async () => {
   return AI_MODELS.map(m => ({ slug: m.slug, label: m.label }));
+});
+
+fastify.get('/api/config', async () => {
+  return { mapboxToken: process.env.MAPBOX_TOKEN ?? '' };
 });
 
 // Register the plugin to serve static files

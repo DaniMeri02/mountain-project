@@ -77,7 +77,7 @@ beforeEach(() => {
 
   mockCacheInstance = {
     get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
+    set: vi.fn().mockResolvedValue(new Date('2026-04-21T10:00:00Z')),
     invalidate: vi.fn().mockResolvedValue(undefined),
   };
 

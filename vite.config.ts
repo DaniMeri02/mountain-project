@@ -8,9 +8,6 @@ export default defineConfig({
     outDir: 'dist/public',
     emptyOutDir: true,
   },
-  optimizeDeps: {
-    exclude: ['mapbox-gl'],
-  },
   server: {
     port: 5173,
     proxy: {

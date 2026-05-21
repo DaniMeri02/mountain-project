@@ -20,6 +20,10 @@ vi.mock('../agent/orchestrator', () => ({
       }),
     };
   }),
+  AI_MODELS: [
+    { slug: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Google)', base: 'https://generativelanguage.googleapis.com/v1beta/openai', key: 'GEMINI_API_KEY' },
+    { slug: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Groq)', base: 'https://api.groq.com/openai/v1', key: 'GROQ_API_KEY' },
+  ],
 }));
 
 // Import server AFTER mocks are registered

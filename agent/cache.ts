@@ -41,27 +41,29 @@ export class AiDescriptionCache {
     };
   }
 
-  /** Inserts or overwrites a cache entry with a fresh 48h TTL. */
+  /** Inserts or overwrites a cache entry with a fresh 48h TTL. Returns the stored expiry date. */
   async set(
     cacheKey: string,
     poiName: string,
     poiType: string,
     description: string,
     sources: string[]
-  ): Promise<void> {
-    await this.pool.query(
+  ): Promise<Date> {
+    const result = await this.pool.query<{ expires_at: Date }>(
       `INSERT INTO ai_description_cache
          (cache_key, poi_name, poi_type, description, sources, expires_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, NOW() + make_interval(hours => ${CACHE_TTL_HOURS}))
+       VALUES ($1, $2, $3, $4, $5::jsonb, NOW() + ($6 * INTERVAL '1 hour'))
        ON CONFLICT (cache_key) DO UPDATE SET
          poi_name     = EXCLUDED.poi_name,
          poi_type     = EXCLUDED.poi_type,
          description  = EXCLUDED.description,
          sources      = EXCLUDED.sources,
          generated_at = NOW(),
-         expires_at   = NOW() + make_interval(hours => ${CACHE_TTL_HOURS})`,
-      [cacheKey, poiName, poiType, description, JSON.stringify(sources)]
+         expires_at   = NOW() + ($6 * INTERVAL '1 hour')
+       RETURNING expires_at`,
+      [cacheKey, poiName, poiType, description, JSON.stringify(sources), CACHE_TTL_HOURS]
     );
+    return new Date(result.rows[0].expires_at);
   }
 
   /** Hard-deletes a cache entry so the next request regenerates it. */

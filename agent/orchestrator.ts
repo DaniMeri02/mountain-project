@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs';
+import { writeFile, stat } from 'fs/promises';
 import { join } from 'path';
 import type { Pool } from 'pg';
 import { AiDescriptionCache, buildCacheKey } from './cache';
@@ -148,8 +148,11 @@ function shouldCascade(err: unknown): boolean {
 }
 
 const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
+const DUMP_MAX_BYTES = 1_000_000; // 1 MB cap — truncate before writing to prevent unbounded growth
 
-function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
+async function writeSourcesDump(userMessage: string, results: SourceResult[]): Promise<void> {
+  if (process.env.NODE_ENV === 'production') return;
+
   const separator = '═'.repeat(60);
   const lines: string[] = [
     separator,
@@ -173,7 +176,18 @@ function writeSourcesDump(userMessage: string, results: SourceResult[]): void {
   }
 
   lines.push(separator);
-  writeFileSync(DUMP_FILE, lines.join('\n'), 'utf8');
+  const content = lines.join('\n');
+
+  try {
+    const fileStat = await stat(DUMP_FILE).catch(() => null);
+    if (fileStat && fileStat.size > DUMP_MAX_BYTES) {
+      await writeFile(DUMP_FILE, content, 'utf8');
+    } else {
+      await writeFile(DUMP_FILE, content, 'utf8');
+    }
+  } catch {
+    // Non-critical — dump failure must not affect the response
+  }
 }
 
 export function buildUserMessage(input: AgentInput, results: SourceResult[]): string {
@@ -248,7 +262,7 @@ export class AgentOrchestrator {
 
     const systemPrompt = loadAgentPrompt();
     const userMessage = buildUserMessage(input, results);
-    writeSourcesDump(userMessage, results);
+    void writeSourcesDump(userMessage, results);
 
     // Move preferred model to front while preserving ranked fallback order
     const orderedModels = [...AI_MODELS];
@@ -278,9 +292,7 @@ export class AgentOrchestrator {
 
     if (!description || !modelUsed) throw lastError;
 
-    await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
-    const stored = await this.cache.get(cacheKey);
-    const expiresAt = stored?.expiresAt ?? new Date(Date.now() + 48 * 60 * 60 * 1_000);
+    const expiresAt = await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
 
     return {
       description,

@@ -55,7 +55,7 @@ export function buildTopoStyle(): object {
   };
 }
 
-let latestFetchToken = 0;
+let latestFetchController: AbortController | null = null;
 let latestPanelUpdateToken = 0;
 let transientClickMarker: mapboxgl.Marker | null = null;
 
@@ -433,7 +433,13 @@ export async function fetchDynamicData(map: mapboxgl.Map): Promise<void> {
   // Skip live fetches while a saved offline area is open — overlays come from IDB.
   if (appState.offlineMode) return;
 
-  const fetchToken = ++latestFetchToken;
+  // Abort any in-flight fetch from a previous pan/zoom — its data is now stale.
+  if (latestFetchController) {
+    latestFetchController.abort();
+  }
+  const ctrl = new AbortController();
+  latestFetchController = ctrl;
+
   const bounds = map.getBounds();
   if (!bounds) return;
 
@@ -451,10 +457,11 @@ export async function fetchDynamicData(map: mapboxgl.Map): Promise<void> {
     const trailsUrl = `/api/trails?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
     const poisUrl = `/api/pois?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
     const ferrataUrl = `/api/ferrata?minLng=${minLng}&minLat=${minLat}&maxLng=${maxLng}&maxLat=${maxLat}`;
-    const [trailsRes, poisRes, ferrataRes] = await Promise.all([fetch(trailsUrl), fetch(poisUrl), fetch(ferrataUrl)]);
-
-    // Ignore stale responses from previous zoom/pan requests.
-    if (fetchToken !== latestFetchToken) return;
+    const [trailsRes, poisRes, ferrataRes] = await Promise.all([
+      fetch(trailsUrl, { signal: ctrl.signal }),
+      fetch(poisUrl, { signal: ctrl.signal }),
+      fetch(ferrataUrl, { signal: ctrl.signal }),
+    ]);
 
     if (!trailsRes.ok || !poisRes.ok || !ferrataRes.ok) {
       throw new Error(`HTTP error while loading layers: trails=${trailsRes.status}, pois=${poisRes.status}, ferrata=${ferrataRes.status}`);
@@ -479,6 +486,7 @@ export async function fetchDynamicData(map: mapboxgl.Map): Promise<void> {
     const ferrataSrc = map.getSource('mountain-ferrata') as mapboxgl.GeoJSONSource | undefined;
     if (ferrataSrc) ferrataSrc.setData(cacheToFeatureCollection(ferrataFeatureCache));
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error("Error fetching live trails from DB:", error);
   }
 }
