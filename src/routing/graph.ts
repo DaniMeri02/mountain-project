@@ -267,6 +267,7 @@ function heapPush(heap: [number, string][], item: [number, string]): void {
 }
 
 function heapPop(heap: [number, string][]): [number, string] {
+  if (heap.length === 0) return [Infinity, ''];
   const top = heap[0];
   const last = heap.pop()!;
   if (heap.length > 0) {
