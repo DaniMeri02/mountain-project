@@ -15,6 +15,13 @@ export interface GraphEdge {
 export interface Graph {
   nodes: Map<string, GraphNode>;
   edges: GraphEdge[];
+  spatialIndex: Map<string, string[]>;
+}
+
+const SPATIAL_CELL_DEG = 0.01; // ~1km cell — snap radius is 300m, so 9 cells cover any query
+
+function spatialCell(lng: number, lat: number): string {
+  return `${Math.floor(lng / SPATIAL_CELL_DEG)}_${Math.floor(lat / SPATIAL_CELL_DEG)}`;
 }
 
 export interface RouteStep {
@@ -84,6 +91,7 @@ function extractLineStrings(feature: RawFeature): unknown[][] {
 export function buildGraph(features: RawFeature[]): Graph {
   const nodes: Map<string, GraphNode> = new Map();
   const edges: GraphEdge[] = [];
+  const spatialIndex: Map<string, string[]> = new Map();
 
   function ensureNode(coord: [number, number]): string {
     const lngKey = Math.round(coord[0] * NODE_KEY_PRECISION);
@@ -110,6 +118,10 @@ export function buildGraph(features: RawFeature[]): Graph {
     }
 
     nodes.set(key, { coord, edgeIndices: [], componentSize: 0 });
+    const cell = spatialCell(coord[0], coord[1]);
+    const bucket = spatialIndex.get(cell);
+    if (bucket) bucket.push(key);
+    else spatialIndex.set(cell, [key]);
     return key;
   }
 
@@ -225,13 +237,30 @@ export function buildGraph(features: RawFeature[]): Graph {
     }
   }
 
-  return { nodes, edges };
+  return { nodes, edges, spatialIndex };
+}
+
+function candidateKeysNear(spatialIndex: Map<string, string[]>, lng: number, lat: number, maxMeters: number): string[] {
+  // Convert maxMeters to a degree buffer — 1 deg lat ≈ 111km; add 1 extra cell for safety.
+  const cellRadius = Math.ceil(maxMeters / (SPATIAL_CELL_DEG * 111000)) + 1;
+  const cLng = Math.floor(lng / SPATIAL_CELL_DEG);
+  const cLat = Math.floor(lat / SPATIAL_CELL_DEG);
+  const keys: string[] = [];
+  for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+      const bucket = spatialIndex.get(`${cLng + dx}_${cLat + dy}`);
+      if (bucket) keys.push(...bucket);
+    }
+  }
+  return keys;
 }
 
 export function snapToNode(graph: Graph, coord: [number, number], maxMeters = 300, minComponentSize = 0): string | null {
   let bestKey: string | null = null;
   let bestDist = Infinity;
-  for (const [key, node] of graph.nodes) {
+  const nearby = candidateKeysNear(graph.spatialIndex, coord[0], coord[1], maxMeters);
+  for (const key of nearby) {
+    const node = graph.nodes.get(key)!;
     if (node.componentSize < minComponentSize) continue;
     const d = haversineMeters(coord, node.coord);
     if (d < bestDist) {
@@ -245,7 +274,9 @@ export function snapToNode(graph: Graph, coord: [number, number], maxMeters = 30
 
 export function nearestNodes(graph: Graph, coord: [number, number], maxMeters = 300, limit = 6, minComponentSize = 0): { key: string; distance: number }[] {
   const candidates: { key: string; distance: number }[] = [];
-  for (const [key, node] of graph.nodes) {
+  const nearby = candidateKeysNear(graph.spatialIndex, coord[0], coord[1], maxMeters);
+  for (const key of nearby) {
+    const node = graph.nodes.get(key)!;
     if (node.componentSize < minComponentSize) continue;
     const d = haversineMeters(coord, node.coord);
     if (d <= maxMeters) candidates.push({ key, distance: d });
