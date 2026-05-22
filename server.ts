@@ -510,11 +510,11 @@ fastify.get('/api/config', async () => {
 
 // Register the plugin to serve static files
 // In production, __dirname is dist/ so path.join(__dirname, 'public') → dist/public/ (Vite output)
-// In dev, Vite dev server handles the frontend on :5173; serve ../public as a fallback
+// In dev, Vite dev server handles the frontend on :5173; serve project-root/public as fallback
 const staticRoot =
   process.env.NODE_ENV === 'production'
     ? path.join(__dirname, 'public')
-    : path.join(__dirname, '../public');
+    : path.join(__dirname, 'public');
 
 fastify.register(fastifyStatic, {
   root: staticRoot,
