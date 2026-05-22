@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import fs from 'fs/promises';
 import path from 'path';
 import { Pool } from 'pg';
@@ -10,13 +11,14 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-// Dynamically chunk the massive Alpine bounding box into smaller 0.15x0.3 degree areas 
-// to prevent Overpass API timeouts (HTTP 504) and Node.js memory crashes.
+// Monte Rosa massif + surrounding Italian/Swiss valleys (Valsesia, Gressoney, Ayas, Zermatt, Saas-Fee)
+// Chunked into 0.15x0.3 degree tiles to avoid Overpass timeouts.
+// Uses ON CONFLICT DO NOTHING — safe to run alongside existing Lombardy data.
 const BBOXES: string[] = [];
-for (let lat = 45.3; lat < 46.8; lat += 0.15) {
-  for (let lon = 8.8; lon < 11.8; lon += 0.3) {
-    const nextLat = Math.min(lat + 0.15, 46.8);
-    const nextLon = Math.min(lon + 0.3, 11.8);
+for (let lat = 45.5; lat < 46.2; lat += 0.15) {
+  for (let lon = 7.4; lon < 8.8; lon += 0.3) {
+    const nextLat = Math.min(lat + 0.15, 46.2);
+    const nextLon = Math.min(lon + 0.3, 8.8);
     BBOXES.push(`(${lat.toFixed(3)}, ${lon.toFixed(3)}, ${nextLat.toFixed(3)}, ${nextLon.toFixed(3)})`);
   }
 }
@@ -61,7 +63,11 @@ async function fetchTrails() {
       try {
         const response = await fetch(OVERPASS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'User-Agent': 'mountain-portal/1.0 (personal project)',
+          },
           body: `data=${encodeURIComponent(query)}`
         });
 

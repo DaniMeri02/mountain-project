@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-// Coordinate Bounding Box for roughly all of Lombardy Alps and Trentino
-const BBOX = '(45.3, 8.8, 46.8, 11.8)';
+// Monte Rosa massif + surrounding Italian/Swiss valleys (Valsesia, Gressoney, Ayas, Zermatt, Saas-Fee)
+// Connects at lng 8.8 with the existing Lombardy dataset (lng 8.8–11.8)
+const BBOX = '(45.5, 7.4, 46.2, 8.8)';
 
 const OVERPASS_QUERY = `
 [out:json][timeout:60];
@@ -24,6 +25,11 @@ async function fetchPOIs() {
   try {
     const response = await fetch(OVERPASS_URL, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'User-Agent': 'mountain-portal/1.0 (personal project)',
+      },
       body: `data=${encodeURIComponent(OVERPASS_QUERY)}`
     });
 

@@ -10,6 +10,7 @@
     "dev": "concurrently --kill-others-on-fail \"tsx watch server.ts\" \"vite\"",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",
+    "import:pois": "tsx scripts/import-pois.ts",
     "fetch:trails": "tsx scripts/fetch-trails.ts",
     "patch:tracks": "tsx scripts/patch-tracks-area.ts",
     "fetch:ferrata": "tsx scripts/fetch-via-ferrata.ts",

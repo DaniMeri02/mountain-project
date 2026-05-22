@@ -95,11 +95,13 @@ type ProgressSnapshot = {
 type ImportMode = 'resume' | 'failed-only' | 'full';
 type ConflictMode = 'nothing' | 'update';
 
-const START_LAT = 45.3;
-const END_LAT = 46.8;
+// Monte Rosa massif + surrounding Italian/Swiss valleys (Valsesia, Gressoney, Ayas, Zermatt, Saas-Fee)
+// Connects at lng 8.8 with the existing Lombardy dataset. Resume mode skips already-completed chunks.
+const START_LAT = 45.5;
+const END_LAT = 46.2;
 const LAT_STEP = 0.15;
-const START_LON = 8.8;
-const END_LON = 11.8;
+const START_LON = 7.4;
+const END_LON = 8.8;
 const LON_STEP = 0.3;
 
 const OVERPASS_URL = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
@@ -390,7 +392,11 @@ async function fetchChunkWithRetries(bbox: BBox, chunkIndex: number, maxRetries:
     try {
       const response = await fetch(OVERPASS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': 'mountain-portal/1.0 (personal project)',
+        },
         body,
         signal: controller.signal
       });
