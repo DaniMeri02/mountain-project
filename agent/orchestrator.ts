@@ -1,4 +1,4 @@
-import { writeFile, stat } from 'fs/promises';
+import { writeFile, appendFile, stat } from 'fs/promises';
 import { join } from 'path';
 import type { Pool } from 'pg';
 import { AiDescriptionCache, buildCacheKey } from './cache';
@@ -180,10 +180,10 @@ async function writeSourcesDump(userMessage: string, results: SourceResult[]): P
 
   try {
     const fileStat = await stat(DUMP_FILE).catch(() => null);
-    if (fileStat && fileStat.size > DUMP_MAX_BYTES) {
+    if (!fileStat || fileStat.size > DUMP_MAX_BYTES) {
       await writeFile(DUMP_FILE, content, 'utf8');
     } else {
-      await writeFile(DUMP_FILE, content, 'utf8');
+      await appendFile(DUMP_FILE, content, 'utf8');
     }
   } catch {
     // Non-critical — dump failure must not affect the response
