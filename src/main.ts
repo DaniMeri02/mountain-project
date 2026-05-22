@@ -68,11 +68,20 @@ function mapboxTransformRequest(url: string): mapboxgl.RequestParameters {
 
   mapboxgl.accessToken = mapboxToken;
 
+  let savedCenter: [number, number] = [9.64, 46.26];
+  let savedZoom = 12;
+  try {
+    const sc = localStorage.getItem('map:center');
+    const sz = localStorage.getItem('map:zoom');
+    if (sc) savedCenter = JSON.parse(sc) as [number, number];
+    if (sz) savedZoom = Number(sz);
+  } catch { /* ignore corrupt localStorage */ }
+
   const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/outdoors-v12',
-    center: [9.64, 46.26],
-    zoom: 12,
+    center: savedCenter,
+    zoom: savedZoom,
     performanceMetricsCollection: false,
     transformRequest: mapboxTransformRequest
   });
@@ -234,6 +243,14 @@ function mapboxTransformRequest(url: string): mapboxgl.RequestParameters {
 
   // Initialize trail route finder
   initRoutingModule(map);
+
+  map.on('moveend', () => {
+    try {
+      const c = map.getCenter();
+      localStorage.setItem('map:center', JSON.stringify([c.lng, c.lat]));
+      localStorage.setItem('map:zoom', String(map.getZoom()));
+    } catch { /* ignore quota errors */ }
+  });
 
   // Resize map when panel content changes (e.g. POI selected, AI description loaded)
   window.addEventListener('panel:updated', () => {
