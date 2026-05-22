@@ -79,7 +79,8 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
 
   function measureTextWidth(text: string, font: string): number {
     if (!measureCanvas) measureCanvas = document.createElement('canvas');
-    const ctx = measureCanvas.getContext('2d')!;
+    const ctx = measureCanvas.getContext('2d');
+    if (!ctx) return 0;
     ctx.font = font;
     return ctx.measureText(text).width;
   }
