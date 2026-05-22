@@ -18,6 +18,7 @@ export function setBasemapMode(mode: string): void {
 export function buildOsmStyle(): object {
   return {
     version: 8,
+    sprite: '',
     glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken,
     sources: {
       osm: {
@@ -38,6 +39,8 @@ export function buildOsmStyle(): object {
 export function buildTopoStyle(): object {
   return {
     version: 8,
+    sprite: '',
+    glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken,
     sources: {
       opentopo: {
         type: 'raster',
@@ -50,7 +53,6 @@ export function buildTopoStyle(): object {
         attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors',
       },
     },
-    glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken,
     layers: [{ id: 'opentopo-raster', type: 'raster', source: 'opentopo' }],
   };
 }
@@ -592,9 +594,9 @@ export function setupStyleSwitcher(map: mapboxgl.Map): void {
       const layerId = target.value;
 
       if (currentMode === 'opentopo') {
-        map.setStyle(buildTopoStyle() as mapboxgl.StyleSpecification);
+        map.setStyle(buildTopoStyle() as mapboxgl.StyleSpecification, { diff: false, localFontFamily: undefined, localIdeographFontFamily: undefined });
       } else if (currentMode === 'osm') {
-        map.setStyle(buildOsmStyle() as mapboxgl.StyleSpecification);
+        map.setStyle(buildOsmStyle() as mapboxgl.StyleSpecification, { diff: false, localFontFamily: undefined, localIdeographFontFamily: undefined });
       } else {
         map.setStyle('mapbox://styles/mapbox/' + layerId);
       }
