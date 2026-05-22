@@ -12,7 +12,11 @@ test.describe('search keyboard navigation', () => {
       route.fulfill({ json: MOCK_RESULTS })
     );
     await page.goto('/');
-    await page.waitForSelector('#search-box');
+    // Wait for initSearch to have run: it is called synchronously after the map
+    // object is created inside the async /api/config IIFE. Under parallel load
+    // the config fetch can be slow, so waitForSelector('#search-box') returns
+    // before the input listeners are attached, making page.type a no-op.
+    await page.waitForFunction(() => Boolean((window as unknown as { __debugMap?: unknown }).__debugMap));
     await page.click('#search-box');
     await page.type('#search-box', 'cur');
     await page.waitForSelector('#search-results li');

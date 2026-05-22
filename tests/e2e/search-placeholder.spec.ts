@@ -63,10 +63,8 @@ test.describe('search placeholder responsive truncation', () => {
       // Rendered text width must fit available content box (with 6px buffer match)
       expect(info.textWidth, `viewport ${w}: text ${info.textWidth}px overflows content ${info.contentBox}px`).toBeLessThanOrEqual(info.contentBox);
 
-      await page.screenshot({
-        path: path.join(SHOT_DIR, `placeholder-${w}.png`),
-        clip: { x: 0, y: 0, width: w, height: 80 },
-      });
+      // Screenshot is a debugging aid — non-fatal if fonts hang under load.
+      await page.screenshot({ path: path.join(SHOT_DIR, `placeholder-${w}.png`), clip: { x: 0, y: 0, width: w, height: 80 } }).catch(() => {});
     }
   });
 
