@@ -18,5 +18,6 @@ export function loadIcons(map: mapboxgl.Map): void {
     img.onload = () => {
       if (!map.hasImage(id)) map.addImage(id, img);
     };
+    img.onerror = () => { console.error(`[icons] Failed to load icon: ${id}`); };
   });
 }
