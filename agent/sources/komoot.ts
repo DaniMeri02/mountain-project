@@ -84,10 +84,12 @@ async function fetchNearbyFallbackTours(
       (h, i, arr) => arr.indexOf(h) === i,
     );
 
-    for (const h of ordered.slice(0, 6)) {
-      const tours = await fetchTours(h.id);
-      if (tours.length > 0) return { tours, sourceHighlight: h };
-    }
+    const candidates = ordered.slice(0, 6);
+    const results = await Promise.all(
+      candidates.map(async (h) => ({ h, tours: await fetchTours(h.id) })),
+    );
+    const hit = results.find((r) => r.tours.length > 0);
+    if (hit) return { tours: hit.tours, sourceHighlight: hit.h };
     return { tours: [], sourceHighlight: null };
   } catch (err) {
     console.error('[Komoot] fetchNearbyFallbackTours failed:', err);
