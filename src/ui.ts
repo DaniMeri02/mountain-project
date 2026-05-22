@@ -152,7 +152,7 @@ async function fetchAiModels(): Promise<AiModel[]> {
   return cachedAiModels;
 }
 
-fetchAiModels(); // pre-warm on module load
+fetchAiModels().catch(() => {}); // pre-warm on module load
 initPanelSwipeDismiss();
 
 export async function updatePanel(props: PanelProps, coordinates: Coordinates | null): Promise<void> {
