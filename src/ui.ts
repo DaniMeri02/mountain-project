@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export interface PanelProps {
   name: string;
   type: string;
@@ -109,11 +111,8 @@ function renderAltitudeText(elevation: number | null | undefined, isLoading: boo
   return 'Not available';
 }
 
-/** Strips <script> tags and inline event handlers from AI-generated HTML before DOM injection. */
 function sanitizeAiHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
-    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '');
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }
 
 export function escapeHtml(str: string | null | undefined): string {
