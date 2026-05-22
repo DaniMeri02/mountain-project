@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import { AgentOrchestrator, AI_MODELS } from './agent/orchestrator';
 import type { PoiType } from './agent/types';
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
 
 type BBoxQuery = {
   minLng?: string;
@@ -54,6 +54,10 @@ export function parseBBox(query: BBoxQuery): ParsedBBox | null {
   }
 
   if (minLng >= maxLng || minLat >= maxLat) {
+    return null;
+  }
+
+  if (minLng < -180 || maxLng > 180 || minLat < -90 || maxLat > 90) {
     return null;
   }
 
