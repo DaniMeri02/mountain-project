@@ -27,6 +27,7 @@ export function isRouting(): boolean {
 }
 
 export function startRoutingMode(map: mapboxgl.Map, onBothPoints: (start: Coord, end: Coord) => void): void {
+  cancelRoutingMode(map);
   _mapRef = map;
   appState.routingMode = true;
   document.body.classList.add('routing-active');
@@ -68,6 +69,7 @@ export function cancelRoutingMode(map: mapboxgl.Map): void {
 }
 
 export function startViaMode(map: mapboxgl.Map, onPoint: (coord: Coord) => void): void {
+  cancelViaMode(map);
   _mapRef = map;
   appState.routingViaMode = true;
   map.getCanvas().style.cursor = 'crosshair';
