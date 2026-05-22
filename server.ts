@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import path from 'path';
 import { Pool } from 'pg';
 import { AgentOrchestrator, AI_MODELS } from './agent/orchestrator';
+import { reloadPrompt } from './agent/prompt-loader';
 import type { PoiType } from './agent/types';
 
 const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
@@ -506,6 +507,11 @@ fastify.post<{ Body: ResearchBody }>(
 
 fastify.get('/api/ai/models', async () => {
   return AI_MODELS.map(m => ({ slug: m.slug, label: m.label }));
+});
+
+fastify.post('/api/ai/reload-prompt', async () => {
+  reloadPrompt();
+  return { ok: true };
 });
 
 fastify.get('/api/config', async () => {
