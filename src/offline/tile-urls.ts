@@ -82,8 +82,9 @@ export function buildOsmUrls(bbox: [number, number, number, number], zMin: numbe
 }
 
 function withToken(url: string): string {
-  const sep = url.includes('?') ? '&' : '?';
-  return url + sep + 'access_token=' + mapboxgl.accessToken;
+  const u = new URL(url);
+  u.searchParams.set('access_token', mapboxgl.accessToken);
+  return u.toString();
 }
 
 function httpsify(url: string): string {
