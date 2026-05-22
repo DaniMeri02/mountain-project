@@ -50,48 +50,50 @@ export function initRoutingModule(map: mapboxgl.Map): void {
   attachAltClickHandler();
   attachViaUiHandlers();
   createReopenButton();
-  (window as Window & { __debugRoute?: unknown }).__debugRoute = async (startCoord: Coord, endCoord: Coord) => {
-    await computeAndDisplayRoute(startCoord, endCoord);
-    if (!_graph) return { error: 'no graph' };
-    const fromNode = _graph.nodes.get(_fromKey!);
-    const toNode = _graph.nodes.get(_toKey!);
-    const compSizes: Map<number, number> = new Map();
-    for (const node of _graph.nodes.values()) compSizes.set(node.componentSize, (compSizes.get(node.componentSize) ?? 0) + 1);
-    return {
-      nodes: _graph.nodes.size, edges: _graph.edges.length,
-      fromKey: _fromKey, toKey: _toKey,
-      fromCoord: fromNode?.coord, toCoord: toNode?.coord,
-      fromCompSize: fromNode?.componentSize, toCompSize: toNode?.componentSize,
-      sameComp: fromNode && toNode && fromNode.componentSize === toNode.componentSize,
-      altsFound: _alternatives.length,
-      altDistances: _alternatives.map(alt => {
-        let d = 0;
-        for (const { coords, reversed } of alt) {
-          const seg = reversed ? [...coords].reverse() : coords;
-          for (let i = 1; i < seg.length; i++) {
-            d += haversineMeters(seg[i - 1], seg[i]);
+  if (import.meta.env.DEV) {
+    (window as Window & { __debugRoute?: unknown }).__debugRoute = async (startCoord: Coord, endCoord: Coord) => {
+      await computeAndDisplayRoute(startCoord, endCoord);
+      if (!_graph) return { error: 'no graph' };
+      const fromNode = _graph.nodes.get(_fromKey!);
+      const toNode = _graph.nodes.get(_toKey!);
+      const compSizes: Map<number, number> = new Map();
+      for (const node of _graph.nodes.values()) compSizes.set(node.componentSize, (compSizes.get(node.componentSize) ?? 0) + 1);
+      return {
+        nodes: _graph.nodes.size, edges: _graph.edges.length,
+        fromKey: _fromKey, toKey: _toKey,
+        fromCoord: fromNode?.coord, toCoord: toNode?.coord,
+        fromCompSize: fromNode?.componentSize, toCompSize: toNode?.componentSize,
+        sameComp: fromNode && toNode && fromNode.componentSize === toNode.componentSize,
+        altsFound: _alternatives.length,
+        altDistances: _alternatives.map(alt => {
+          let d = 0;
+          for (const { coords, reversed } of alt) {
+            const seg = reversed ? [...coords].reverse() : coords;
+            for (let i = 1; i < seg.length; i++) {
+              d += haversineMeters(seg[i - 1], seg[i]);
+            }
           }
-        }
-        return Math.round(d);
-      }),
-      compDistribution: Object.fromEntries([...compSizes].sort((a, b) => b[0] - a[0]).slice(0, 8)),
+          return Math.round(d);
+        }),
+        compDistribution: Object.fromEntries([...compSizes].sort((a, b) => b[0] - a[0]).slice(0, 8)),
+      };
     };
-  };
-  (window as Window & { __debugGaps?: unknown }).__debugGaps = (compSizeA: number, compSizeB: number) => {
-    if (!_graph) return 'no graph';
-    const nodesA = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeA);
-    const nodesB = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeB);
-    let minDist = Infinity;
-    let bestA: Coord | null = null;
-    let bestB: Coord | null = null;
-    for (const a of nodesA) {
-      for (const b of nodesB) {
-        const d = haversineMeters(a.coord, b.coord);
-        if (d < minDist) { minDist = d; bestA = a.coord; bestB = b.coord; }
+    (window as Window & { __debugGaps?: unknown }).__debugGaps = (compSizeA: number, compSizeB: number) => {
+      if (!_graph) return 'no graph';
+      const nodesA = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeA);
+      const nodesB = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeB);
+      let minDist = Infinity;
+      let bestA: Coord | null = null;
+      let bestB: Coord | null = null;
+      for (const a of nodesA) {
+        for (const b of nodesB) {
+          const d = haversineMeters(a.coord, b.coord);
+          if (d < minDist) { minDist = d; bestA = a.coord; bestB = b.coord; }
+        }
       }
-    }
-    return { minGapMeters: Math.round(minDist), coordA: bestA, coordB: bestB };
-  };
+      return { minGapMeters: Math.round(minDist), coordA: bestA, coordB: bestB };
+    };
+  }
 }
 
 function injectDrawerSection(): void {
