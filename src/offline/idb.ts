@@ -105,11 +105,14 @@ export async function incrTileRefs(urls: string[]): Promise<void> {
   const db = await openDB();
   const t = tx(db, STORE_TILE_REFS, 'readwrite');
   const store = t.objectStore(STORE_TILE_REFS);
-  for (const url of urls) {
-    const existing = await reqAsPromise<TileRef | undefined>(store.get(url));
-    const next: TileRef = existing ? { url, count: existing.count + 1 } : { url, count: 1 };
-    await reqAsPromise(store.put(next));
-  }
+  // Fire all gets at once so the transaction stays active across the await point.
+  const existing = await Promise.all(urls.map(url => reqAsPromise<TileRef | undefined>(store.get(url))));
+  await Promise.all(
+    urls.map((url, i) => {
+      const prev = existing[i];
+      return reqAsPromise(store.put({ url, count: prev ? prev.count + 1 : 1 }));
+    })
+  );
 }
 
 export async function decrTileRefs(urls: string[]): Promise<string[]> {
@@ -117,16 +120,19 @@ export async function decrTileRefs(urls: string[]): Promise<string[]> {
   const db = await openDB();
   const t = tx(db, STORE_TILE_REFS, 'readwrite');
   const store = t.objectStore(STORE_TILE_REFS);
+  // Fire all gets at once so the transaction stays active across the await point.
+  const existing = await Promise.all(urls.map(url => reqAsPromise<TileRef | undefined>(store.get(url))));
   const evictable: string[] = [];
-  for (const url of urls) {
-    const existing = await reqAsPromise<TileRef | undefined>(store.get(url));
-    if (!existing) continue;
-    if (existing.count <= 1) {
-      await reqAsPromise(store.delete(url));
-      evictable.push(url);
-    } else {
-      await reqAsPromise(store.put({ url, count: existing.count - 1 }));
-    }
-  }
+  await Promise.all(
+    urls.map((url, i) => {
+      const prev = existing[i];
+      if (!prev) return Promise.resolve();
+      if (prev.count <= 1) {
+        evictable.push(url);
+        return reqAsPromise(store.delete(url));
+      }
+      return reqAsPromise(store.put({ url, count: prev.count - 1 }));
+    })
+  );
   return evictable;
 }
