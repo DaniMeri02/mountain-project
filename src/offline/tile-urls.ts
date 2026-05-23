@@ -83,7 +83,7 @@ export function buildOsmUrls(bbox: [number, number, number, number], zMin: numbe
 
 function withToken(url: string): string {
   const u = new URL(url);
-  u.searchParams.set('access_token', mapboxgl.accessToken);
+  u.searchParams.set('access_token', mapboxgl.accessToken ?? '');
   return u.toString();
 }
 
