@@ -10,6 +10,28 @@ import { appState } from './state';
 
 initNav();
 
+if (import.meta.env.DEV) {
+  import('web-vitals/attribution').then(({ onINP }) => {
+    onINP((m) => {
+      const a = m.attribution;
+      const longestScript = a.longAnimationFrameEntries
+        ?.flatMap((entry) => entry.scripts)
+        .sort((x, y) => (y.duration ?? 0) - (x.duration ?? 0))[0];
+      console.warn(`[INP] ${m.value.toFixed(0)}ms ${m.rating}`);
+      console.table({
+        target: a.interactionTarget,
+        type: a.interactionType,
+        inputDelay: a.inputDelay,
+        processingDuration: a.processingDuration,
+        presentationDelay: a.presentationDelay,
+        longestScript: longestScript?.invoker,
+        scriptDur: longestScript?.duration,
+        scriptSrc: longestScript?.sourceURL,
+      });
+    }, { reportAllChanges: true });
+  }).catch((err) => console.warn('[INP] web-vitals load failed', err));
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.body.classList.contains('panel-open')) {
     closePanel();
