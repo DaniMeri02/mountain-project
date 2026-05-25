@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl';
 import { loadIcons } from './icons';
-import { updatePanel, updateCoordinatesPanel, closePanel } from './ui';
+import { updatePanel, updateCoordinatesPanel, closePanel, patchPoiElevation, patchCoordinatesElevation } from './ui';
 import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
 import { appState } from './state';
 
@@ -504,7 +504,7 @@ export function setupMapInteractivity(map: mapboxgl.Map): void {
     map.getCanvas().style.cursor = '';
   });
 
-  map.on('click', 'pois-points', async (e) => {
+  map.on('click', 'pois-points', (e) => {
     if (appState.routingMode || appState.routingViaMode) return;
     removeTransientClickMarker();
     const panelToken = ++latestPanelUpdateToken;
@@ -514,21 +514,22 @@ export function setupMapInteractivity(map: mapboxgl.Map): void {
 
     const coordinates = getFeatureCoordinates(feature, e.lngLat);
     const properties = feature.properties ? { ...feature.properties } : {};
-    await updatePanel(properties as Parameters<typeof updatePanel>[0], coordinates);
 
-    if (!coordinates || hasValidElevationValue((properties as Record<string, unknown>).elevation)) {
-      return;
-    }
-
-    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates);
-    if (panelToken !== latestPanelUpdateToken || derivedElevation === null) {
-      return;
-    }
-
-    await updatePanel({ ...(properties as Parameters<typeof updatePanel>[0]), elevation: derivedElevation }, coordinates);
+    // Render panel immediately so the click "responds" within the INP budget.
+    // Elevation, if missing, is fetched in the background and patched into the
+    // existing badge once the terrain tile resolves — no rebuild, no await chain.
+    void updatePanel(properties as Parameters<typeof updatePanel>[0], coordinates).then(() => {
+      if (!coordinates || hasValidElevationValue((properties as Record<string, unknown>).elevation)) {
+        return;
+      }
+      return resolveElevationFromCoordinates(map, coordinates).then((derivedElevation) => {
+        if (panelToken !== latestPanelUpdateToken) return;
+        patchPoiElevation(derivedElevation);
+      });
+    });
   });
 
-  map.on('click', async (e) => {
+  map.on('click', (e) => {
     // Keep POI click behavior intact; only show raw coordinates on plain map clicks.
     const poiAtPoint = map.getLayer('pois-points')
       ? map.queryRenderedFeatures(e.point, { layers: ['pois-points'] })
@@ -563,12 +564,11 @@ export function setupMapInteractivity(map: mapboxgl.Map): void {
     upsertTransientClickMarker(map, coordinates);
     updateCoordinatesPanel(coordinates.lng, coordinates.lat, null, true);
 
-    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates);
-    if (panelToken !== latestPanelUpdateToken) {
-      return;
-    }
-
-    updateCoordinatesPanel(coordinates.lng, coordinates.lat, derivedElevation, false);
+    // Fire-and-patch: avoid blocking INP on the 5×140ms terrain retry loop.
+    void resolveElevationFromCoordinates(map, coordinates).then((derivedElevation) => {
+      if (panelToken !== latestPanelUpdateToken) return;
+      patchCoordinatesElevation(derivedElevation);
+    });
   });
 
   document.addEventListener('keydown', (e) => {

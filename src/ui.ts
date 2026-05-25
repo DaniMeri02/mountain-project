@@ -169,9 +169,15 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
     : '';
   const elevationText = escapeHtml(formatElevationLabel(props.elevation));
   const hasElevation = elevationText !== '';
+  const willResolveElevation = !hasElevation
+    && Boolean(coordinates)
+    && Number.isFinite(Number(coordinates?.lat))
+    && Number.isFinite(Number(coordinates?.lng));
   const elevationBadgeHTML = hasElevation
-    ? `<span class="badge badge-elevation">${elevationText}</span>`
-    : '';
+    ? `<span class="badge badge-elevation" id="poi-elevation">${elevationText}</span>`
+    : willResolveElevation
+      ? `<span class="badge badge-elevation is-loading" id="poi-elevation">…</span>`
+      : '';
   const hasCoordinates = coordinates
     && Number.isFinite(Number(coordinates.lat))
     && Number.isFinite(Number(coordinates.lng));
@@ -329,7 +335,7 @@ export function updateCoordinatesPanel(lng: number, lat: number, elevation: numb
     <div class="panel-badges">
       <span class="badge badge-type">Map Click</span>
     </div>
-    <p class="panel-info-line"><strong>Altitude:</strong> ${altitudeText}</p>
+    <p class="panel-info-line"><strong>Altitude:</strong> <span id="coord-elevation">${altitudeText}</span></p>
     <p class="panel-info-line"><strong>Latitude:</strong> ${latFixed}</p>
     <p class="panel-info-line"><strong>Longitude:</strong> ${lngFixed}</p>
     <p class="panel-info-secondary">Decimal format: ${latFixed}, ${lngFixed}</p>
@@ -337,4 +343,23 @@ export function updateCoordinatesPanel(lng: number, lat: number, elevation: numb
 
   attachPanelClose();
   openPanel();
+}
+
+// Targeted DOM patches — used to update a single field after the panel has
+// already painted, so we don't block INP on slow terrain elevation fetches.
+export function patchPoiElevation(elevation: number | null): void {
+  const badge = document.getElementById('poi-elevation');
+  if (!badge) return;
+  if (elevation == null) {
+    badge.remove();
+    return;
+  }
+  badge.textContent = `${Math.round(elevation)}m asl`;
+  badge.classList.remove('is-loading');
+}
+
+export function patchCoordinatesElevation(elevation: number | null): void {
+  const span = document.getElementById('coord-elevation');
+  if (!span) return;
+  span.innerHTML = renderAltitudeText(elevation, false);
 }

@@ -549,6 +549,7 @@ body.map-fullscreen #map-container {
 }
 .badge-type { background-color: #2c3e50; }
 .badge-elevation { background-color: #7f8c8d; }
+.badge-elevation.is-loading { background-color: #b0b6b6; opacity: 0.8; }
 .badge-coordinates { background-color: #2980b9; }
 .panel-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; }
 .panel-divider { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
