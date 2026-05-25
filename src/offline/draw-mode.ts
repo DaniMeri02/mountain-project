@@ -158,10 +158,21 @@ export function startDrawMode(
     setTimeout(() => { if (onDone) onDone(bbox); }, 1000);
   };
 
+  // Coalesce mousemove repaints to one per animation frame; pointer events
+  // can fire 200+/sec on high-Hz trackpads and each setData() triggers a
+  // Mapbox layer repaint. Without this throttle, drawing produces long
+  // animation frames that show up in INP/LoAF traces.
+  let rafPending = false;
+  let pendingBbox: [number, number, number, number] | null = null;
   const handleMove = (e: mapboxgl.MapMouseEvent) => {
     if (!state.firstCorner) return;
-    const bbox = normalizeBbox(state.firstCorner, { lng: e.lngLat.lng, lat: e.lngLat.lat });
-    setDrawData(map, bboxPolygon(bbox));
+    pendingBbox = normalizeBbox(state.firstCorner, { lng: e.lngLat.lng, lat: e.lngLat.lat });
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (pendingBbox) setDrawData(map, bboxPolygon(pendingBbox));
+    });
   };
 
   const handleKey = (e: KeyboardEvent) => {
