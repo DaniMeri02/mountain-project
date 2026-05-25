@@ -43104,26 +43104,6 @@
     {
       "type": "Feature",
       "properties": {
-        "id": 13012232123,
-        "name": "Refugio pastore",
-        "type": "hut",
-        "elevation": "N/D",
-        "sort_elevation": 0,
-        "website": "",
-        "description": "",
-        "osm_id": 13012232123
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          7.9286368,
-          45.8836089
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
         "id": 13020984939,
         "name": "Prà Camarée",
         "type": "peak",
@@ -44838,6 +44818,26 @@
         "coordinates": [
           8.0882056,
           45.7473015
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 216171137,
+        "name": "Bivacco Falispa",
+        "type": "bivouac",
+        "elevation": "N/D",
+        "sort_elevation": 0,
+        "website": "",
+        "description": "",
+        "osm_id": 216171137
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.1844881,
+          45.7825473
         ]
       }
     },
