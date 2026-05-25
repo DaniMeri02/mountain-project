@@ -587,11 +587,32 @@ export function setupStyleSwitcher(map: mapboxgl.Map): void {
   const layerList = document.getElementById('menu');
   const inputs = layerList ? layerList.getElementsByTagName('input') : [];
 
+  // Loading overlay shown while Mapbox rebuilds the style. Mapbox's setStyle
+  // is paint-bound (~200ms presentationDelay) and can't be shortened — this
+  // makes the wait perceptually intentional instead of a frozen UI.
+  const overlay = document.createElement('div');
+  overlay.id = 'basemap-loading-overlay';
+  overlay.hidden = true;
+  overlay.innerHTML =
+    '<span class="basemap-loading-spinner" aria-hidden="true"></span>' +
+    '<span class="basemap-loading-text">Switching basemap…</span>';
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'polite');
+  const mapContainer = document.getElementById('map-container');
+  (mapContainer ?? document.body).appendChild(overlay);
+
   for (const input of Array.from(inputs)) {
     input.onclick = (e) => {
       const target = e.target as HTMLInputElement;
+      // Bail on no-op clicks (clicking the already-active radio).
+      if (currentMode === target.id) return;
       currentMode = target.id;
       const layerId = target.value;
+
+      overlay.hidden = false;
+      map.once('style.load', () => {
+        overlay.hidden = true;
+      });
 
       if (currentMode === 'opentopo') {
         map.setStyle(buildTopoStyle() as mapboxgl.StyleSpecification, { diff: false, localFontFamily: undefined, localIdeographFontFamily: undefined });
@@ -601,11 +622,17 @@ export function setupStyleSwitcher(map: mapboxgl.Map): void {
         map.setStyle('mapbox://styles/mapbox/' + layerId);
       }
 
-      // Instantly rotate the camera when switching to/from 3D mode
-      if (currentMode === 'satellite-3d') {
-        map.easeTo({ pitch: 70, bearing: 20 });
-      } else {
-        map.easeTo({ pitch: 0, bearing: 0 });
+      // Defer camera animation until after the new style has loaded; running
+      // it concurrently with setStyle doubles the paint work and stretches
+      // INP. Skip entirely if pitch/bearing are already at target.
+      const targetPitch = currentMode === 'satellite-3d' ? 70 : 0;
+      const targetBearing = currentMode === 'satellite-3d' ? 20 : 0;
+      const pitchDelta = Math.abs(map.getPitch() - targetPitch);
+      const bearingDelta = Math.abs(map.getBearing() - targetBearing);
+      if (pitchDelta > 0.5 || bearingDelta > 0.5) {
+        map.once('style.load', () => {
+          map.easeTo({ pitch: targetPitch, bearing: targetBearing });
+        });
       }
     };
   }
