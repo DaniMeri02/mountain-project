@@ -397,6 +397,9 @@ main {
   z-index: 65;
   overflow-y: auto;
   pointer-events: none;
+  /* Isolate panel layout/paint so big innerHTML swaps don't force the rest
+     of the page (map canvas, drawer) to recompute. */
+  contain: layout paint;
 }
 body.panel-open #panel {
   transform: translateY(0);
@@ -557,7 +560,16 @@ body.map-fullscreen #map-container {
 .panel-info-secondary { margin: 0; color: #666; font-size: 0.9rem; }
 
 /* AI Guide section */
-.ai-container { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }
+.ai-container {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  /* Skip layout/paint of the AI section while it's scrolled out of the
+     panel viewport. The intrinsic size keeps the scrollbar honest. */
+  content-visibility: auto;
+  contain-intrinsic-size: 600px;
+}
 .ai-section-title { margin-top: 0; font-size: 1.1rem; color: #333; }
 .ai-intro-text { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
 .ai-model-wrapper { margin-bottom: 8px; }
