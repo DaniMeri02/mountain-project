@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import { yieldToMain } from './util/yield';
 
 export interface PanelProps {
   name: string;
@@ -253,6 +254,11 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
     if (loadingDiv) loadingDiv.style.display = 'block';
     if (resultSection) resultSection.style.display = 'none';
 
+    // Yield once so the spinner-state paint commits before we head into
+    // fetch/sanitize/innerHTML. Without this the user can see no feedback
+    // until the whole pipeline finishes.
+    await yieldToMain();
+
     const endpoint = forceRegenerate ? '/api/ai/research/regenerate' : '/api/ai/research';
     const modelSlug = (document.getElementById('ai-model-select') as HTMLSelectElement | null)?.value ?? null;
 
@@ -273,10 +279,15 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
       if (resultSection) resultSection.style.display = 'block';
 
       if (resultContent) {
+        // Yield before DOMPurify — sanitize on large AI descriptions can be
+        // 20–100ms of regex work. Splitting it from fetch handling keeps
+        // each task bounded.
+        await yieldToMain();
         let html = sanitizeAiHtml(data.description ?? '');
         if (data.modelUsed) {
           html += `<p class="ai-model-used-note">🤖 Generato da: ${escapeHtml(data.modelUsed)}</p>`;
         }
+        await yieldToMain();
         resultContent.innerHTML = html;
       }
 
