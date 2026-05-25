@@ -1,14 +1,8 @@
 import mapboxgl from 'mapbox-gl';
-import {
-  buildGraph,
-  nearestNodes,
-  findAlternatives,
-  findRoundTrip,
-  haversineMeters,
-  findBestSnappedRoute,
-  findBestMultiViaAlternatives,
-} from './graph';
-import type { Graph, RouteStep } from './graph';
+import { haversineMeters } from './graph';
+import type { RouteStep } from './graph';
+import RoutingWorker from './routing.worker?worker';
+import type { ComputeRequest, ResultMessage, ErrorMessage } from './routing.worker';
 import { generateGpx, downloadGpx } from './gpx';
 import { setRouteHighlight, setRouteAlternatives, setRouteReturn, clearRouteHighlight } from './highlight';
 import {
@@ -27,21 +21,21 @@ import { bumpPanelToken } from '../map';
 import { appState } from '../state';
 
 type Coord = [number, number];
+type WorkerResponse = ResultMessage | ErrorMessage;
 
 let _map: mapboxgl.Map | null = null;
-let _graph: Graph | null = null;
-let _fromKey: string | null = null;
-let _toKey: string | null = null;
 let _alternatives: RouteStep[][] = [];
 let _selectedIdx = 0;
 let _altClickAttached = false;
 let _startCoord: Coord | null = null;
 let _endCoord: Coord | null = null;
 let _viaCoords: Coord[] = [];
-let _viaKeys: string[] = [];
 let _viaUiAttached = false;
 let _panelUserClosed = false;
 let _reopenBtn: HTMLElement | null = null;
+let _worker: Worker | null = null;
+let _latestJobSeq = 0;
+let _roundTripActive = false;
 
 export function initRoutingModule(map: mapboxgl.Map): void {
   _map = map;
@@ -53,47 +47,38 @@ export function initRoutingModule(map: mapboxgl.Map): void {
   if (import.meta.env.DEV) {
     (window as Window & { __debugRoute?: unknown }).__debugRoute = async (startCoord: Coord, endCoord: Coord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
-      if (!_graph) return { error: 'no graph' };
-      const fromNode = _graph.nodes.get(_fromKey!);
-      const toNode = _graph.nodes.get(_toKey!);
-      const compSizes: Map<number, number> = new Map();
-      for (const node of _graph.nodes.values()) compSizes.set(node.componentSize, (compSizes.get(node.componentSize) ?? 0) + 1);
       return {
-        nodes: _graph.nodes.size, edges: _graph.edges.length,
-        fromKey: _fromKey, toKey: _toKey,
-        fromCoord: fromNode?.coord, toCoord: toNode?.coord,
-        fromCompSize: fromNode?.componentSize, toCompSize: toNode?.componentSize,
-        sameComp: fromNode && toNode && fromNode.componentSize === toNode.componentSize,
         altsFound: _alternatives.length,
-        altDistances: _alternatives.map(alt => {
-          let d = 0;
-          for (const { coords, reversed } of alt) {
-            const seg = reversed ? [...coords].reverse() : coords;
-            for (let i = 1; i < seg.length; i++) {
-              d += haversineMeters(seg[i - 1], seg[i]);
-            }
-          }
-          return Math.round(d);
-        }),
-        compDistribution: Object.fromEntries([...compSizes].sort((a, b) => b[0] - a[0]).slice(0, 8)),
+        altDistances: _alternatives.map((alt) => Math.round(routeDistanceKm(alt) * 1000)),
       };
     };
-    (window as Window & { __debugGaps?: unknown }).__debugGaps = (compSizeA: number, compSizeB: number) => {
-      if (!_graph) return 'no graph';
-      const nodesA = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeA);
-      const nodesB = [..._graph.nodes.values()].filter(n => n.componentSize === compSizeB);
-      let minDist = Infinity;
-      let bestA: Coord | null = null;
-      let bestB: Coord | null = null;
-      for (const a of nodesA) {
-        for (const b of nodesB) {
-          const d = haversineMeters(a.coord, b.coord);
-          if (d < minDist) { minDist = d; bestA = a.coord; bestB = b.coord; }
-        }
-      }
-      return { minGapMeters: Math.round(minDist), coordA: bestA, coordB: bestB };
-    };
   }
+}
+
+function getWorker(): Worker {
+  if (!_worker) _worker = new RoutingWorker();
+  return _worker;
+}
+
+// Run a compute on the routing worker. Latest-wins: stale results are dropped
+// silently so a slow recompute can't overwrite a newer one.
+function runWorkerCompute(payload: Omit<ComputeRequest, 'kind' | 'jobId'>): Promise<WorkerResponse | null> {
+  const jobId = String(++_latestJobSeq);
+  const worker = getWorker();
+  return new Promise((resolve) => {
+    const onMessage = (e: MessageEvent<WorkerResponse>) => {
+      if (e.data.jobId !== jobId) return;
+      worker.removeEventListener('message', onMessage);
+      if (jobId !== String(_latestJobSeq)) {
+        resolve(null);
+        return;
+      }
+      resolve(e.data);
+    };
+    worker.addEventListener('message', onMessage);
+    const request: ComputeRequest = { ...payload, kind: 'compute', jobId };
+    worker.postMessage(request);
+  });
 }
 
 function injectDrawerSection(): void {
@@ -118,7 +103,6 @@ function attachFindRouteButton(): void {
       cancelViaMode(_map!);
       clearViaMarkers();
       _viaCoords = [];
-      _viaKeys = [];
       appState.routingHasRoute = false;
       document.body.classList.remove('panel-open');
       syncReopenButton();
@@ -128,19 +112,19 @@ function attachFindRouteButton(): void {
     cancelViaMode(_map!);
     clearViaMarkers();
     _viaCoords = [];
-    _viaKeys = [];
     startRoutingMode(_map!, async (startCoord, endCoord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
     });
   });
 }
 
-async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord): Promise<void> {
+async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundTrip = false): Promise<void> {
   const hadRoute = appState.routingHasRoute;
   appState.routingHasRoute = false;
   _panelUserClosed = false;
   _startCoord = startCoord;
   _endCoord = endCoord;
+  _roundTripActive = roundTrip;
 
   const expand = 0.05;
   const minLng = Math.min(startCoord[0], endCoord[0]) - expand;
@@ -161,78 +145,76 @@ async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord): Promi
     const features = [
       ...(trailsData.features ?? []),
       ...(ferrataData.features ?? [])
-    ] as mapboxgl.GeoJSONFeature[];
+    ];
 
-    _graph = buildGraph(features);
-    if (!_graph.nodes.size) {
-      clearRoutingMarkers();
-      showToast('No trail data found in this area.');
-      if (hadRoute) appState.routingHasRoute = true;
-      return;
-    }
-    let best = findBestSnappedRoute(_graph, startCoord, endCoord, { maxMeters: 300, candidateLimit: 6 });
+    const response = await runWorkerCompute({
+      features,
+      startCoord,
+      endCoord,
+      viaCoords: [..._viaCoords],
+      roundTrip,
+    });
 
-    if (!best.startCandidates.length) {
-      clearRoutingMarkers();
-      showToast('No trail nearby — click closer to a trail.');
-      if (hadRoute) appState.routingHasRoute = true;
-      return;
-    }
-    if (!best.endCandidates.length) {
-      clearRoutingMarkers();
-      showToast('No trail nearby at end point — click closer to a trail.');
+    if (response === null) return; // superseded by a newer request
+
+    if (response.kind === 'error') {
+      console.error('Routing worker error:', response.message);
+      showToast('Failed to compute route.');
       if (hadRoute) appState.routingHasRoute = true;
       return;
     }
 
-    if (!best.path) {
-      let maxComp = 0;
-      for (const n of _graph.nodes.values()) if (n.componentSize > maxComp) maxComp = n.componentSize;
-      const minComp = Math.max(10, Math.floor(maxComp * 0.05));
-      const retry = findBestSnappedRoute(_graph, startCoord, endCoord, { maxMeters: 500, candidateLimit: 6, minComponentSize: minComp });
-      if (retry.path) best = retry;
-    }
-
-    if (!best.path || !best.fromKey || !best.toKey) {
-      clearRoutingMarkers();
-      showToast('No route found between these points.');
-      if (hadRoute) appState.routingHasRoute = true;
-      return;
-    }
-
-    _fromKey = best.fromKey;
-    _toKey = best.toKey;
-
-    const fromNode = _graph.nodes.get(_fromKey);
-    const toNode = _graph.nodes.get(_toKey);
-    if (fromNode || toNode) setRoutingMarkers(_map!, fromNode?.coord, toNode?.coord);
-
-    if (_viaCoords.length > 0) {
-      const viaRoutes = buildMultiViaRoute();
-      if (!viaRoutes) {
+    const outcome = response.outcome;
+    switch (outcome.type) {
+      case 'no-trails':
+        clearRoutingMarkers();
+        showToast('No trail data found in this area.');
         if (hadRoute) appState.routingHasRoute = true;
         return;
+      case 'no-start':
+        clearRoutingMarkers();
+        showToast('No trail nearby — click closer to a trail.');
+        if (hadRoute) appState.routingHasRoute = true;
+        return;
+      case 'no-end':
+        clearRoutingMarkers();
+        showToast('No trail nearby at end point — click closer to a trail.');
+        if (hadRoute) appState.routingHasRoute = true;
+        return;
+      case 'no-via':
+        showToast(`No trail nearby at pass-through point ${outcome.viaIdx + 1}.`);
+        if (hadRoute) appState.routingHasRoute = true;
+        return;
+      case 'no-route':
+        clearRoutingMarkers();
+        showToast('No route found between these points.');
+        if (hadRoute) appState.routingHasRoute = true;
+        return;
+      case 'ok': {
+        setRoutingMarkers(_map!, outcome.fromCoord, outcome.toCoord);
+
+        clearViaMarkers();
+        for (const coord of outcome.viaCoordsResolved) {
+          addViaMarker(_map!, coord);
+        }
+
+        _alternatives = outcome.alternatives;
+        _selectedIdx = 0;
+        appState.routingHasRoute = true;
+
+        if (outcome.roundTrip) {
+          setRouteHighlight(_map!, outcome.roundTrip.outbound);
+          setRouteReturn(_map!, outcome.roundTrip.returnRoute);
+          if (outcome.roundTrip.onlyOnePath) {
+            showToast('Only one path available for round trip.');
+          }
+          if (!_panelUserClosed) showRoutePanel();
+        } else {
+          renderRoute();
+        }
+        return;
       }
-      _alternatives = viaRoutes;
-      _selectedIdx = 0;
-      appState.routingHasRoute = true;
-      renderRoute();
-      return;
     }
-
-    _alternatives = findAlternatives(_graph, _fromKey, _toKey);
-
-    if (!_alternatives.length) {
-      clearRoutingMarkers();
-      showToast('No route found between these points.');
-      if (hadRoute) appState.routingHasRoute = true;
-      return;
-    }
-
-    _alternatives = sortAlternativesByDistance(_alternatives);
-    _selectedIdx = 0;
-    appState.routingHasRoute = true;
-    renderRoute();
   } catch (err) {
     console.error('Route computation failed', err);
     if (hadRoute) appState.routingHasRoute = true;
@@ -271,45 +253,6 @@ function routeDistanceKm(edges: RouteStep[]): number {
     for (let i = 1; i < seg.length; i++) total += haversineMeters(seg[i], seg[i - 1]);
   }
   return total / 1000;
-}
-
-function sortAlternativesByDistance(routes: RouteStep[][]): RouteStep[][] {
-  return routes
-    .map((route) => ({ route, distance: routeDistanceKm(route) }))
-    .sort((a, b) => a.distance - b.distance)
-    .map((entry) => entry.route);
-}
-
-function buildMultiViaRoute(): RouteStep[][] | null {
-  if (!_graph || !_viaCoords.length || !_fromKey || !_toKey) return null;
-  clearViaMarkers();
-  const candidateLimit = 4;
-  const viaCandidates: string[][] = [];
-
-  for (let i = 0; i < _viaCoords.length; i++) {
-    const candidates = nearestNodes(_graph, _viaCoords[i], 300, candidateLimit)
-      .map(c => c.key)
-      .filter((key, idx, arr) => arr.indexOf(key) === idx);
-    if (!candidates.length) {
-      showToast(`No trail nearby at pass-through point ${i + 1}.`);
-      return null;
-    }
-    viaCandidates.push(candidates);
-  }
-
-  const result = findBestMultiViaAlternatives(_graph, _fromKey, viaCandidates, _toKey);
-  if (!result.alts.length || !result.viaKeys.length) {
-    showToast('No route found through all pass-through points.');
-    return null;
-  }
-
-  _viaKeys = result.viaKeys;
-  for (const key of _viaKeys) {
-    const node = _graph.nodes.get(key);
-    if (node) addViaMarker(_map!, node.coord);
-  }
-
-  return result.alts;
 }
 
 function showRoutePanel(): void {
@@ -393,15 +336,14 @@ function showRoutePanel(): void {
   });
 
   const roundtripEl = panel.querySelector('#route-roundtrip') as HTMLInputElement;
+  if (_roundTripActive) roundtripEl.checked = true;
   roundtripEl.addEventListener('change', (e) => {
     if (viaActive || viaPicking) return;
-    if ((e.target as HTMLInputElement).checked) {
-      const result = findRoundTrip(_graph!, _fromKey!, _toKey!);
-      if (!result) return;
-      if (result.onlyOnePath) showToast('Only one path available for round trip.');
-      setRouteHighlight(_map!, result.outbound);
-      setRouteReturn(_map!, result.returnRoute);
+    const checked = (e.target as HTMLInputElement).checked;
+    if (checked) {
+      if (_startCoord && _endCoord) void computeAndDisplayRoute(_startCoord, _endCoord, true);
     } else {
+      _roundTripActive = false;
       renderRoute();
     }
   });
@@ -441,7 +383,6 @@ function showRoutePanel(): void {
       const idx = parseInt((btn as HTMLElement).dataset['idx'] ?? '', 10);
       if (!Number.isFinite(idx)) return;
       _viaCoords.splice(idx, 1);
-      _viaKeys.splice(idx, 1);
       removeViaMarkerAt(idx);
       if (_startCoord && _endCoord) void computeAndDisplayRoute(_startCoord, _endCoord);
     });
@@ -458,8 +399,8 @@ function showRoutePanel(): void {
     cancelRoutingMode(_map!);
     cancelViaMode(_map!);
     _viaCoords = [];
-    _viaKeys = [];
     appState.routingHasRoute = false;
+    _roundTripActive = false;
     syncReopenButton();
     showNewRoutePanel();
   });
@@ -492,7 +433,6 @@ function showNewRoutePanel(): void {
     cancelViaMode(_map!);
     clearViaMarkers();
     _viaCoords = [];
-    _viaKeys = [];
     startRoutingMode(_map!, async (startCoord, endCoord) => {
       await computeAndDisplayRoute(startCoord, endCoord);
     });
