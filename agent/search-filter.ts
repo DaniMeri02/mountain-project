@@ -82,8 +82,13 @@ export function validateFilter(raw: unknown): SearchFilter {
 
   let elevation: ElevationRange | null = null;
   const elev = asRecord(obj.elevation);
-  const elevMin = finiteOrNull(elev.min);
-  const elevMax = finiteOrNull(elev.max);
+  // Elevations are positive metres. Treat 0/negative bounds as "absent" — models often
+  // emit max:0 as a "no upper bound" sentinel — and drop a max that sits below the min.
+  let elevMin = finiteOrNull(elev.min);
+  let elevMax = finiteOrNull(elev.max);
+  if (elevMin != null && elevMin <= 0) elevMin = null;
+  if (elevMax != null && elevMax <= 0) elevMax = null;
+  if (elevMin != null && elevMax != null && elevMin > elevMax) elevMax = null;
   if (elevMin != null || elevMax != null) elevation = { min: elevMin, max: elevMax };
 
   let area: SearchArea | null = null;

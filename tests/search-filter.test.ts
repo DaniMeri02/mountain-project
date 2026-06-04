@@ -73,6 +73,18 @@ describe('validateFilter', () => {
   it('drops a non-finite elevation', () => {
     expect(validateFilter({ elevation: { min: 'abc' } }).elevation).toBeNull();
   });
+
+  it('treats a 0 elevation max as "no upper bound" (common LLM sentinel)', () => {
+    expect(validateFilter({ elevation: { min: 2000, max: 0 } }).elevation).toEqual({ min: 2000, max: null });
+  });
+
+  it('treats a 0 or negative elevation min as "no lower bound"', () => {
+    expect(validateFilter({ elevation: { min: 0, max: 1500 } }).elevation).toEqual({ min: null, max: 1500 });
+  });
+
+  it('drops a contradictory max below min, keeping the floor', () => {
+    expect(validateFilter({ elevation: { min: 3000, max: 2000 } }).elevation).toEqual({ min: 3000, max: null });
+  });
 });
 
 describe('parseFilterJson', () => {

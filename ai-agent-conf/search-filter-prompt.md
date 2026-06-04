@@ -42,6 +42,7 @@ Default: `types` vuoto = tutti i tipi; `sort` = "elevation_desc"; `limit` = 50; 
 - "sotto/meno di/fino a N m", "< N" → `elevation.max = N`
 - "tra N e M", "da N a M" → `elevation.min = N`, `elevation.max = M`
 - "N m s.l.m." è solo l'unità (slm = sul livello del mare), non un filtro a sé.
+- Per un limite NON richiesto usa `null`, MAI `0` (es. "sopra i 2000m" → `{"min":2000,"max":null}`).
 
 ## Area geografica → area
 
