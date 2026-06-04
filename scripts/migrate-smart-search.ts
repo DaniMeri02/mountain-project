@@ -33,10 +33,19 @@ async function migrate(): Promise<void> {
 
     // 2. Elevation: stop conflating "unknown" with sea level. Make it nullable, then
     //    convert the 0 sentinels to NULL (no Alpine peak/hut/bivouac sits at 0 m), so
-    //    "sopra i N metri" filters exclude unknowns honestly. backfill:elevation fills them.
-    await client.query(`ALTER TABLE pois ALTER COLUMN elevation DROP NOT NULL`);
-    const updated = await client.query(`UPDATE pois SET elevation = NULL WHERE elevation = 0`);
-    console.log(`  ✓ pois.elevation is now nullable; ${updated.rowCount ?? 0} zero-sentinels set to NULL`);
+    //    "sopra i N metri" filters exclude unknowns honestly. Best-effort: this needs
+    //    ownership of `pois`; if the app role lacks it, the feature still works because
+    //    backfill:elevation fills both NULL *and* 0 rows with real DEM elevations.
+    try {
+      await client.query(`ALTER TABLE pois ALTER COLUMN elevation DROP NOT NULL`);
+      const updated = await client.query(`UPDATE pois SET elevation = NULL WHERE elevation = 0`);
+      console.log(`  ✓ pois.elevation is now nullable; ${updated.rowCount ?? 0} zero-sentinels set to NULL`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`  ! Skipped pois.elevation nullability change (${msg}).`);
+      console.warn(`    Run it once as the table owner: ALTER TABLE pois ALTER COLUMN elevation DROP NOT NULL;`);
+      console.warn(`    Not required for the feature — backfill:elevation still fixes 0/NULL elevations.`);
+    }
 
     console.log('\nMigration completed successfully.');
   } finally {
