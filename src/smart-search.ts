@@ -54,15 +54,36 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     window.dispatchEvent(new Event('panel:updated'));
   }
 
+  function resetResultsState(): void {
+    currentFilter = null;
+    results = [];
+    total = 0;
+    modelUsed = undefined;
+    busy = false;
+  }
+
+  function exitResults(): void {
+    clearSearchResultMarkers(map);
+    resetResultsState();
+    closePanel();
+  }
+
+  function makeExitButton(): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'results-exit';
+    btn.textContent = 'Esci';
+    btn.setAttribute('aria-label', 'Chiudi risultati');
+    btn.addEventListener('click', exitResults);
+    return btn;
+  }
+
   function makeCloseButton(): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.id = 'panel-close';
     btn.setAttribute('aria-label', 'Chiudi');
     btn.textContent = '×';
-    btn.addEventListener('click', () => {
-      clearSearchResultMarkers(map);
-      closePanel();
-    });
+    btn.addEventListener('click', exitResults);
     return btn;
   }
 
@@ -70,12 +91,18 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     if (!panel) return;
     panel.innerHTML = '';
     panel.appendChild(makeCloseButton());
+    const header = document.createElement('div');
+    header.className = 'results-header';
+    const titleRow = document.createElement('div');
+    titleRow.className = 'results-title-row';
     const h = document.createElement('h2');
     h.textContent = heading;
+    titleRow.append(h, makeExitButton());
+    header.appendChild(titleRow);
     const p = document.createElement('p');
     p.className = loading ? 'results-loading' : 'results-empty';
     p.textContent = message;
-    panel.append(h, p);
+    panel.append(header, p);
     openPanel();
   }
 
@@ -126,8 +153,11 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
 
     const header = document.createElement('div');
     header.className = 'results-header';
+    const titleRow = document.createElement('div');
+    titleRow.className = 'results-title-row';
     const h = document.createElement('h2');
     h.textContent = 'Risultati';
+    titleRow.append(h, makeExitButton());
     const count = document.createElement('p');
     count.className = 'results-count';
     count.textContent =
@@ -136,7 +166,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
         : total > results.length
           ? `Mostrando ${results.length} di ${total}`
           : `${total} ${total === 1 ? 'risultato' : 'risultati'}`;
-    header.append(h, count);
+    header.append(titleRow, count);
     panel.appendChild(header);
 
     if (results.length === 0) {

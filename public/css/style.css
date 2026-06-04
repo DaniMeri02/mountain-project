@@ -1462,9 +1462,32 @@ body.offline-mode #search-container input:focus {
 body.offline-mode #ai-search-btn { opacity: 0.4; pointer-events: none; }
 
 .results-header { margin-bottom: var(--space-2); }
+.results-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 .results-header h2 { margin: 0; font-size: 1.2rem; color: var(--color-ink); }
 .results-count { margin: 2px 0 0; font-size: 0.82rem; color: var(--color-ink-soft); }
 .results-loading, .results-empty { font-size: 0.92rem; color: var(--color-ink-soft); line-height: 1.5; }
+
+.results-exit {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-glass-strong);
+  color: var(--color-ink-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.results-exit:hover {
+  background: rgba(46, 125, 50, 0.10);
+  border-color: rgba(46, 125, 50, 0.3);
+  color: var(--color-ink);
+}
 
 .results-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .result-row {

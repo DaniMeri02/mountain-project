@@ -29,10 +29,15 @@ interface AiResponse {
   modelUsed?: string;
 }
 
+const DEFAULT_PANEL_HTML = `
+  <h2>Location Details</h2>
+  <p>Select a location on the map to view more information here.</p>
+`;
+
 export function closePanel(): void {
   document.body.classList.remove('panel-open');
   const panel = document.getElementById('panel');
-  if (panel) panel.innerHTML = '';
+  if (panel) panel.innerHTML = DEFAULT_PANEL_HTML;
 }
 
 function initPanelSwipeDismiss(): void {
