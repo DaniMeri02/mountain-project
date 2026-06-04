@@ -97,7 +97,7 @@ export function sanitizeAiResponse(text: string): string {
   return cleaned.trim();
 }
 
-async function callAiModel(
+export async function callAiModel(
   model: AiModel,
   systemPrompt: string,
   userMessage: string,
@@ -139,7 +139,7 @@ async function callAiModel(
  * Returns true if the error warrants trying the next model in the fallback chain.
  * Returns false for errors that indicate a client-side mistake (bad key, malformed request, etc.)
  */
-function shouldCascade(err: unknown): boolean {
+export function shouldCascade(err: unknown): boolean {
   const status = (err as { status?: number }).status;
   if (status == null) return true;  // network error / timeout — transient
   if (status === 429) return true;  // rate-limited — next model may have quota
