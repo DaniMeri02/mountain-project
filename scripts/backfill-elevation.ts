@@ -1,9 +1,10 @@
 import 'dotenv/config';
 import { Pool } from 'pg';
 
-// Batch point-elevation API (lat/lng → metres). Open-Elevation is free & keyless;
-// override with any compatible endpoint (e.g. a self-hosted OpenTopoData) via env.
-const DEM_API_URL = process.env.DEM_API_URL ?? 'https://api.open-elevation.com/api/v1/lookup';
+// Batch point-elevation API (lat/lng → metres). OpenTopoData is free & keyless
+// (1 req/s, ≤100 points per call). Override the dataset/host with DEM_API_URL,
+// e.g. https://api.opentopodata.org/v1/eudem25m for higher-res European data.
+const DEM_API_URL = process.env.DEM_API_URL ?? 'https://api.opentopodata.org/v1/srtm30m';
 const BATCH_SIZE = 100;
 const BATCH_DELAY_MS = 1_000; // be polite to the public endpoint
 
@@ -13,8 +14,6 @@ interface PoiRow {
   lng: number;
 }
 interface ElevationResult {
-  latitude: number;
-  longitude: number;
   elevation: number | null;
 }
 interface ElevationResponse {
@@ -41,7 +40,7 @@ async function lookupElevations(batch: PoiRow[]): Promise<Map<number, number>> {
   const res = await fetch(DEM_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ locations: batch.map((p) => ({ latitude: p.lat, longitude: p.lng })) }),
+    body: JSON.stringify({ locations: batch.map((p) => `${p.lat},${p.lng}`).join('|') }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} from DEM API`);
