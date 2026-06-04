@@ -1,0 +1,51 @@
+import 'dotenv/config';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  database: process.env.DB_NAME,
+});
+
+async function migrate(): Promise<void> {
+  const client = await pool.connect();
+  console.log('Connected to database. Running smart-search migration...');
+
+  try {
+    // 1. Administrative boundaries (ISTAT/OSM provinces + regions) for area filters.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_areas (
+        id   BIGSERIAL PRIMARY KEY,
+        kind TEXT NOT NULL,            -- 'province' | 'region'
+        name TEXT NOT NULL,            -- canonical name, e.g. 'Bergamo', 'Lombardia'
+        geom geometry NOT NULL         -- (Multi)Polygon, SRID 4326
+      )
+    `);
+    console.log('  ✓ Table admin_areas created (or already exists)');
+
+    await client.query(`CREATE INDEX IF NOT EXISTS admin_areas_geom_gix ON admin_areas USING GIST (geom)`);
+    console.log('  ✓ GIST index on admin_areas.geom');
+
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS admin_areas_kind_name_uidx ON admin_areas (kind, lower(name))`);
+    console.log('  ✓ Unique index on admin_areas (kind, lower(name))');
+
+    // 2. Elevation: stop conflating "unknown" with sea level. Make it nullable, then
+    //    convert the 0 sentinels to NULL (no Alpine peak/hut/bivouac sits at 0 m), so
+    //    "sopra i N metri" filters exclude unknowns honestly. backfill:elevation fills them.
+    await client.query(`ALTER TABLE pois ALTER COLUMN elevation DROP NOT NULL`);
+    const updated = await client.query(`UPDATE pois SET elevation = NULL WHERE elevation = 0`);
+    console.log(`  ✓ pois.elevation is now nullable; ${updated.rowCount ?? 0} zero-sentinels set to NULL`);
+
+    console.log('\nMigration completed successfully.');
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+migrate().catch((err: unknown) => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});

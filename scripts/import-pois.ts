@@ -28,8 +28,10 @@ async function importPois() {
       
       const geom = `{"type": "Point", "coordinates": [${coords[0]}, ${coords[1]}]}`;
       
-      let elevation = 0;
-      if (typeof props.elevation === 'number') elevation = props.elevation;
+      // Store NULL (not 0) when elevation is unknown, so "above N metres" filters
+      // exclude unknowns honestly. backfill-elevation.ts fills these from a DEM later.
+      let elevation: number | null = null;
+      if (typeof props.elevation === 'number' && props.elevation !== 0) elevation = props.elevation;
       else if (typeof props.elevation === 'string' && props.elevation !== 'N/D') {
         const parsed = parseInt(props.elevation, 10);
         if (!isNaN(parsed)) elevation = parsed;
@@ -39,7 +41,7 @@ async function importPois() {
         await pool.query(
           `INSERT INTO pois (osm_id, type, name, elevation, geom) 
            VALUES ($1, $2, $3, $4, ST_SetSRID(ST_GeomFromGeoJSON($5), 4326))
-           ON CONFLICT (osm_id) DO UPDATE SET type = EXCLUDED.type, name = EXCLUDED.name, elevation = EXCLUDED.elevation, geom = EXCLUDED.geom`,
+           ON CONFLICT (osm_id) DO UPDATE SET type = EXCLUDED.type, name = EXCLUDED.name, elevation = COALESCE(EXCLUDED.elevation, pois.elevation), geom = EXCLUDED.geom`,
           [props.osm_id || props.id, props.type, props.name || null, elevation, geom]
         );
         inserted++;
