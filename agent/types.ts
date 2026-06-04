@@ -220,3 +220,74 @@ export interface RedditSearchResponse {
     children: RedditPost[];
   };
 }
+
+// ─── Smart filtering search ─────────────────────────────────────────────────
+// The constrained shape the AI emits (validated server-side) and the backend
+// turns into a parameterized PostGIS query. The LLM never produces SQL.
+
+export type SearchableType = 'peak' | 'hut' | 'bivouac' | 'ferrata';
+
+export type SortKey = 'elevation_desc' | 'elevation_asc' | 'name';
+
+/** How a place reference resolves: a named admin polygon, or a bounding box. */
+export type AreaKind = 'province' | 'region' | 'viewport' | 'bbox';
+
+export interface SearchArea {
+  kind: AreaKind;
+  /** Canonical admin name for kind 'province' | 'region', e.g. "Bergamo", "Lombardia". */
+  name?: string | null;
+  /** [minLng, minLat, maxLng, maxLat] for kind 'viewport' | 'bbox'. */
+  bbox?: [number, number, number, number] | null;
+}
+
+export interface ElevationRange {
+  min?: number | null;
+  max?: number | null;
+}
+
+/** Via ferrata difficulty grade range. 1..6 inputs are normalized to A..F. */
+export interface FerrataScaleRange {
+  min?: string | null;
+  max?: string | null;
+}
+
+export interface DifficultyFilter {
+  viaFerrataScale?: FerrataScaleRange | null;
+  sacScale?: string[] | null;
+}
+
+export interface SearchFilter {
+  /** Empty array = all searchable types. */
+  types: SearchableType[];
+  elevation?: ElevationRange | null;
+  area?: SearchArea | null;
+  difficulty?: DifficultyFilter | null;
+  nameContains?: string | null;
+  sort: SortKey;
+  limit: number;
+  offset: number;
+}
+
+/** A single POI row returned by the smart search query. */
+export interface PoiResult {
+  id: number | null;
+  osm_id: number | string | null;
+  type: string;
+  name: string;
+  elevation: number | null;
+  lng: number;
+  lat: number;
+  via_ferrata_scale: string | null;
+  sac_scale: string | null;
+  source_type: string | null;
+}
+
+export interface SmartSearchResult {
+  /** The filter actually executed — the frontend replays it for pagination. */
+  filter: SearchFilter;
+  results: PoiResult[];
+  total: number;
+  offset: number;
+  limit: number;
+  modelUsed?: string;
+}
