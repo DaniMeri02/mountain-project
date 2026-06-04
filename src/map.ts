@@ -665,3 +665,63 @@ export function applyOverlayVisibility(map: mapboxgl.Map): void {
     map.setLayoutProperty(layerId, 'visibility', input.checked ? 'visible' : 'none');
   }
 }
+
+// ─── Smart-search result markers ─────────────────────────────────────────────
+// A dedicated highlighted layer for filtered search hits, distinct from the
+// viewport POI symbols. Created lazily so it survives independently of style loads.
+
+export interface SearchResultPoint {
+  lng: number;
+  lat: number;
+}
+
+function ensureSearchResultLayer(map: mapboxgl.Map): void {
+  if (!map.getSource('search-results-src')) {
+    map.addSource('search-results-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  }
+  if (!map.getLayer('search-results-circles')) {
+    map.addLayer({
+      id: 'search-results-circles',
+      type: 'circle',
+      source: 'search-results-src',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 5, 12, 8, 16, 11] as unknown as mapboxgl.Expression,
+        'circle-color': '#e67e22',
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 2,
+        'circle-opacity': 0.9,
+      },
+    });
+  }
+}
+
+/** Replace the highlighted result set and frame it (flyTo for one, fitBounds for many). */
+export function setSearchResultMarkers(map: mapboxgl.Map, points: SearchResultPoint[]): void {
+  ensureSearchResultLayer(map);
+  const src = map.getSource('search-results-src') as mapboxgl.GeoJSONSource | undefined;
+  if (!src) return;
+
+  src.setData({
+    type: 'FeatureCollection',
+    features: points.map((p) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      properties: {},
+    })),
+  });
+
+  if (points.length === 0) return;
+  if (points.length === 1) {
+    map.flyTo({ center: [points[0].lng, points[0].lat], zoom: 13, essential: true });
+    return;
+  }
+
+  const bounds = new mapboxgl.LngLatBounds();
+  for (const p of points) bounds.extend([p.lng, p.lat]);
+  map.fitBounds(bounds, { padding: 64, maxZoom: 13, duration: 800 });
+}
+
+export function clearSearchResultMarkers(map: mapboxgl.Map): void {
+  const src = map.getSource('search-results-src') as mapboxgl.GeoJSONSource | undefined;
+  if (src) src.setData({ type: 'FeatureCollection', features: [] });
+}

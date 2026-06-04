@@ -1,6 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { updatePanel, type PanelProps, type Coordinates } from './ui';
 import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
+import { initSmartSearch } from './smart-search';
 
 interface SearchResult {
   name: string;
@@ -51,6 +52,9 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
   const searchBox = searchBoxEl;
   const searchResults = searchResultsEl;
   const searchContainer = searchContainerEl;
+
+  // Wire the ✨ AI button → natural-language filtering search (autocomplete stays as-is).
+  initSmartSearch(map, searchBox);
 
   const PLACEHOLDER_TIERS = [
     'Search huts, peaks, bivouacs, via ferrata',

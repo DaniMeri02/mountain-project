@@ -1,0 +1,277 @@
+import type mapboxgl from 'mapbox-gl';
+import { updatePanel, closePanel, patchPoiElevation, type PanelProps } from './ui';
+import { setSearchResultMarkers, clearSearchResultMarkers } from './map';
+import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
+
+// Frontend-local DTO mirroring the server's PoiResult. The `filter` is opaque here —
+// we just echo it back for pagination so the server doesn't re-run the LLM.
+interface SmartResult {
+  id: number | null;
+  osm_id: number | string | null;
+  type: string;
+  name: string;
+  elevation: number | null;
+  lng: number;
+  lat: number;
+  via_ferrata_scale: string | null;
+  sac_scale: string | null;
+  source_type: string | null;
+}
+
+interface SmartResponse {
+  filter: unknown;
+  results: SmartResult[];
+  total: number;
+  offset: number;
+  limit: number;
+  modelUsed?: string;
+}
+
+const TYPE_ICON: Record<string, string> = { hut: '🏠', bivouac: '⛺', peak: '⛰️', ferrata: '🧗' };
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement): void {
+  const button = document.getElementById('ai-search-btn');
+  const panel = document.getElementById('panel');
+  if (!button || !panel) return;
+
+  let currentFilter: unknown = null;
+  let results: SmartResult[] = [];
+  let total = 0;
+  let modelUsed: string | undefined;
+  let busy = false;
+
+  function viewportBbox(): [number, number, number, number] | undefined {
+    const b = map.getBounds();
+    return b ? [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] : undefined;
+  }
+
+  function openPanel(): void {
+    document.body.classList.add('panel-open');
+    window.dispatchEvent(new Event('panel:updated'));
+  }
+
+  function makeCloseButton(): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.id = 'panel-close';
+    btn.setAttribute('aria-label', 'Chiudi');
+    btn.textContent = '×';
+    btn.addEventListener('click', () => {
+      clearSearchResultMarkers(map);
+      closePanel();
+    });
+    return btn;
+  }
+
+  function renderSingle(message: string, heading: string, loading: boolean): void {
+    if (!panel) return;
+    panel.innerHTML = '';
+    panel.appendChild(makeCloseButton());
+    const h = document.createElement('h2');
+    h.textContent = heading;
+    const p = document.createElement('p');
+    p.className = loading ? 'results-loading' : 'results-empty';
+    p.textContent = message;
+    panel.append(h, p);
+    openPanel();
+  }
+
+  function metaText(r: SmartResult): string {
+    if (r.type === 'ferrata') {
+      return r.via_ferrata_scale ? `Via ferrata · scala ${r.via_ferrata_scale}` : 'Via ferrata';
+    }
+    const parts = [capitalize(r.type)];
+    if (typeof r.elevation === 'number' && r.elevation > 0) parts.push(`${r.elevation} m`);
+    return parts.join(' · ');
+  }
+
+  function makeRow(r: SmartResult): HTMLLIElement {
+    const li = document.createElement('li');
+    li.className = 'result-row';
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+
+    const icon = document.createElement('span');
+    icon.className = 'result-icon';
+    icon.textContent = TYPE_ICON[r.type] ?? '📍';
+
+    const body = document.createElement('div');
+    body.className = 'result-body';
+    const name = document.createElement('strong');
+    name.className = 'result-name';
+    name.textContent = r.name; // textContent → XSS-safe (name comes from the DB)
+    const meta = document.createElement('small');
+    meta.className = 'result-meta';
+    meta.textContent = metaText(r);
+    body.append(name, meta);
+
+    li.append(icon, body);
+    li.addEventListener('click', () => void selectResult(r));
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        void selectResult(r);
+      }
+    });
+    return li;
+  }
+
+  function renderResults(): void {
+    if (!panel) return;
+    panel.innerHTML = '';
+    panel.appendChild(makeCloseButton());
+
+    const header = document.createElement('div');
+    header.className = 'results-header';
+    const h = document.createElement('h2');
+    h.textContent = 'Risultati';
+    const count = document.createElement('p');
+    count.className = 'results-count';
+    count.textContent =
+      total === 0
+        ? 'Nessun risultato'
+        : total > results.length
+          ? `Mostrando ${results.length} di ${total}`
+          : `${total} ${total === 1 ? 'risultato' : 'risultati'}`;
+    header.append(h, count);
+    panel.appendChild(header);
+
+    if (results.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'results-empty';
+      empty.textContent = 'Nessun luogo corrisponde. Prova ad allargare i criteri.';
+      panel.appendChild(empty);
+      openPanel();
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'results-list';
+    for (const r of results) list.appendChild(makeRow(r));
+    panel.appendChild(list);
+
+    if (results.length < total) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'results-more';
+      more.textContent = 'Carica altri';
+      more.addEventListener('click', () => void loadMore());
+      panel.appendChild(more);
+    }
+
+    if (modelUsed) {
+      const note = document.createElement('p');
+      note.className = 'results-model-note';
+      note.textContent = `🤖 ${modelUsed}`;
+      panel.appendChild(note);
+    }
+
+    openPanel();
+  }
+
+  function injectBackButton(): void {
+    if (!panel || panel.querySelector('.results-back')) return;
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'results-back';
+    back.textContent = '← Risultati';
+    back.addEventListener('click', () => renderResults());
+    panel.insertBefore(back, panel.firstChild);
+  }
+
+  async function selectResult(r: SmartResult): Promise<void> {
+    map.flyTo({ center: [r.lng, r.lat], zoom: 15, speed: 1.4, essential: true });
+    const coords = { lat: r.lat, lng: r.lng };
+    const props: PanelProps =
+      r.type === 'ferrata'
+        ? {
+            name: r.name,
+            type: r.type,
+            elevation: r.via_ferrata_scale ? `Scala ${r.via_ferrata_scale}` : null,
+            via_ferrata_scale: r.via_ferrata_scale,
+            description: 'Tratto di via ferrata.',
+            osm_id: r.osm_id,
+            website: '',
+          }
+        : { name: r.name, type: r.type, elevation: r.elevation, osm_id: r.osm_id };
+
+    await updatePanel(props, coords);
+    injectBackButton();
+
+    if (r.type !== 'ferrata' && !hasValidElevationValue(r.elevation)) {
+      const derived = await resolveElevationFromCoordinates(map, coords);
+      patchPoiElevation(derived);
+    }
+  }
+
+  async function run(query: string): Promise<void> {
+    const q = query.trim();
+    if (q.length < 2 || busy) return;
+    busy = true;
+    renderSingle(`Interpreto: “${q}”…`, 'Ricerca intelligente', true);
+    try {
+      const res = await fetch('/api/search/smart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q, viewport: viewportBbox() }),
+      });
+      if (res.status === 422) {
+        renderSingle('Non ho capito la domanda. Prova a riformularla.', 'Ricerca intelligente', false);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as SmartResponse;
+      currentFilter = data.filter;
+      results = data.results;
+      total = data.total;
+      modelUsed = data.modelUsed;
+      renderResults();
+      setSearchResultMarkers(map, results.map((r) => ({ lng: r.lng, lat: r.lat })));
+    } catch (err) {
+      console.error('Smart search failed:', err);
+      renderSingle('Errore durante la ricerca. Riprova.', 'Ricerca intelligente', false);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function loadMore(): Promise<void> {
+    if (busy || results.length >= total) return;
+    busy = true;
+    const moreBtn = panel?.querySelector('.results-more') as HTMLButtonElement | null;
+    if (moreBtn) {
+      moreBtn.disabled = true;
+      moreBtn.textContent = 'Caricamento…';
+    }
+    try {
+      const res = await fetch('/api/search/smart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filter: currentFilter, offset: results.length }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as SmartResponse;
+      results = results.concat(data.results);
+      total = data.total;
+      renderResults();
+      setSearchResultMarkers(map, results.map((r) => ({ lng: r.lng, lat: r.lat })));
+    } catch (err) {
+      console.error('Load more failed:', err);
+      if (moreBtn) {
+        moreBtn.disabled = false;
+        moreBtn.textContent = 'Carica altri';
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
+  button.addEventListener('click', () => {
+    const dropdown = document.getElementById('search-results');
+    if (dropdown) dropdown.style.display = 'none';
+    void run(searchBox.value);
+  });
+}
