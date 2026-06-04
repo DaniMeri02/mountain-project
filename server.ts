@@ -5,7 +5,9 @@ import path from 'path';
 import { Pool } from 'pg';
 import { AgentOrchestrator, AI_MODELS } from './agent/orchestrator';
 import { reloadPrompt } from './agent/prompt-loader';
-import type { PoiType } from './agent/types';
+import { buildSearchQuery } from './agent/search-query';
+import { translateQuery, validateFilter } from './agent/search-filter';
+import type { PoiResult, PoiType, SearchFilter, SmartSearchResult } from './agent/types';
 
 const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
 
@@ -411,6 +413,101 @@ fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) 
     return reply.status(500).send({ error: 'Search query failed' });
   }
 });
+
+// ─── Smart filtering search ─────────────────────────────────────────────────
+// Accepts EITHER { q } (AI translates NL → filter, then queries) OR { filter, offset }
+// (re-runs an already-translated filter for pagination — no LLM call).
+
+type SmartSearchBody = {
+  q?: string;
+  filter?: unknown;
+  offset?: number;
+  viewport?: [number, number, number, number];
+};
+
+const smartSearchBodySchema = {
+  body: {
+    type: 'object',
+    properties: {
+      q: { type: 'string' },
+      filter: { type: 'object' },
+      offset: { type: 'integer', minimum: 0 },
+      viewport: { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4 },
+    },
+  },
+} as const;
+
+fastify.post<{ Body: SmartSearchBody }>(
+  '/api/search/smart',
+  { schema: smartSearchBodySchema },
+  async (request, reply) => {
+    const { q, filter: rawFilter, offset, viewport } = request.body;
+
+    let filter: SearchFilter;
+    let modelUsed: string | undefined;
+
+    if (rawFilter !== undefined && rawFilter !== null) {
+      // Pagination / replay path — reuse the filter, no LLM.
+      filter = validateFilter(rawFilter);
+      if (typeof offset === 'number') filter.offset = Math.max(0, Math.trunc(offset));
+    } else if (typeof q === 'string' && q.trim().length >= 2) {
+      try {
+        const translation = await translateQuery(q.trim());
+        filter = translation.filter;
+        modelUsed = translation.modelUsed;
+      } catch (error) {
+        fastify.log.error(error);
+        return reply
+          .status(422)
+          .send({ error: 'Non sono riuscito a interpretare la domanda. Prova a riformularla.' });
+      }
+    } else {
+      return reply.status(400).send({ error: 'Provide either a query (q) or a filter.' });
+    }
+
+    // "in questa zona" — the model only flags kind=viewport; fill the bbox from the live map view.
+    if (filter.area && filter.area.kind === 'viewport' && !filter.area.bbox) {
+      filter.area = viewport ? { kind: 'viewport', bbox: viewport } : null;
+    }
+
+    const { sql, params } = buildSearchQuery(filter);
+
+    try {
+      const result = await pool.query(sql, params);
+      const rows = result.rows as Array<PoiResult & { total: string | number }>;
+      const total = rows.length > 0 ? Number(rows[0].total) : 0;
+      const results: PoiResult[] = rows.map((r) => ({
+        id: r.id,
+        osm_id: r.osm_id,
+        type: r.type,
+        name: r.name,
+        elevation: r.elevation,
+        lng: r.lng,
+        lat: r.lat,
+        via_ferrata_scale: r.via_ferrata_scale,
+        sac_scale: r.sac_scale,
+        source_type: r.source_type,
+      }));
+      const response: SmartSearchResult = {
+        filter,
+        results,
+        total,
+        offset: filter.offset,
+        limit: filter.limit,
+        modelUsed,
+      };
+      return response;
+    } catch (error) {
+      if (getErrorCode(error) === '42P01') {
+        // admin_areas / via_ferrata not created yet — degrade gracefully to an empty set.
+        fastify.log.warn('Smart search: a required table is missing. Returning empty result set.');
+        return { filter, results: [], total: 0, offset: filter.offset, limit: filter.limit, modelUsed } satisfies SmartSearchResult;
+      }
+      fastify.log.error(error);
+      return reply.status(500).send({ error: 'Smart search query failed' });
+    }
+  },
+);
 
 // ─── AI Agent ─────────────────────────────────────────────────────────────────
 
