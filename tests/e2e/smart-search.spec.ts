@@ -79,7 +79,7 @@ test.describe('smart filtering search', () => {
     });
     expect(markerCount).toBe(3);
 
-    await page.screenshot({ path: 'tests/e2e/__screens__/smart-search-list.png' }).catch(() => {});
+    await page.screenshot({ path: '.playwright-mcp/smart-search-list.png' }).catch(() => {});
   });
 
   test('clicking a result opens its detail view with a back button', async ({ page }) => {
