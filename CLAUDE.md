@@ -19,6 +19,9 @@ npm run dev           # start dev server at http://localhost:3000
 npm run build         # esbuild → dist/server.js
 npm run start         # node dist/server.js (production)
 npm run migrate:ai    # create ai_description_cache table (run once per DB instance)
+npm run migrate:search # create admin_areas table + make pois.elevation nullable (run once)
+npm run import:areas  # import ISTAT/openpolis province+region boundaries into admin_areas
+npm run backfill:elevation # fill missing POI elevations from a free DEM API (one-time)
 npm run fetch:data    # fetch POIs from Overpass API
 npm run fetch:ferrata # fetch via ferrata routes
 npm run import:ferrata # import via ferrata into DB
@@ -37,6 +40,7 @@ npm run typecheck     # tsc --noEmit
 | `trails` | Hiking paths — id, osm_id, name, sac_scale, geom (LineString) |
 | `via_ferrata` | Via ferrata routes — id, osm_id, name, via_ferrata_scale, sac_scale, source_type, geom |
 | `ai_description_cache` | AI-generated descriptions — cache_key (SHA256), poi_name, poi_type, description, sources (JSONB), generated_at, expires_at (48h TTL) |
+| `admin_areas` | Province + region polygons (ISTAT/openpolis) — id, kind ('province'\|'region'), name, geom; powers smart-search area filters via ST_Intersects (GIST-indexed) |
 
 ## API endpoints
 
@@ -46,6 +50,7 @@ npm run typecheck     # tsc --noEmit
 | GET | `/api/trails` | Trails in bbox |
 | GET | `/api/ferrata` | Via ferrata in bbox |
 | GET | `/api/search` | Autocomplete search (20 results max) |
+| POST | `/api/search/smart` | Natural-language filtering search → POI list (AI translate + paginate) |
 | GET | `/api/offline/bundle` | Single round-trip download: all 3 datasets for offline mode (max 0.5° bbox) |
 | GET | `/api/ai/models` | List available AI models `[{ slug, label }]` |
 | POST | `/api/ai/research` | Generate AI description (cache-first) |
@@ -53,6 +58,9 @@ npm run typecheck     # tsc --noEmit
 
 `POST /api/ai/research` body: `{ name, type, elevation?, osm_id?, lat?, lng?, modelSlug? }`
 Response: `{ description, fromCache, sources[], generatedAt, expiresAt, modelUsed? }`
+
+`POST /api/search/smart` body: `{ q }` (AI translates NL → filter, then queries) **or** `{ filter, offset }` (re-run a known filter for pagination — no LLM). Optional `viewport: [minLng,minLat,maxLng,maxLat]` resolves "in questa zona".
+Response: `{ filter, results[], total, offset, limit, modelUsed? }`. Filter shape: `SearchFilter` in `agent/types.ts`.
 
 ## AI agent architecture
 
@@ -62,6 +70,8 @@ agent/
   cache.ts                ← AiDescriptionCache class (get/set/invalidate)
   prompt-loader.ts        ← reads ai-agent-conf/agent-prompt.md (memory-cached per process)
   orchestrator.ts         ← main flow: parallel sources → AI cascade → cache → response
+  search-filter.ts        ← NL query → validated SearchFilter (AI cascade + 6h in-process cache); reads ai-agent-conf/search-filter-prompt.md
+  search-query.ts         ← pure SearchFilter → parameterized PostGIS query (pois ∪ ferrata)
   sources/
     http.ts               ← shared fetchHtml() + SCRAPER_HEADERS utility
     wikidata.ts           ← Wikidata SPARQL (elevation, Wikipedia, description)
