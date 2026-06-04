@@ -8,7 +8,8 @@ senza blocchi di codice.
 ```json
 {
   "types": ["peak" | "hut" | "bivouac" | "ferrata"],
-  "elevation": { "min": <numero|null>, "max": <numero|null> },
+  "minElevation": <numero|null>,
+  "maxElevation": <numero|null>,
   "area": {
     "kind": "province" | "region" | "viewport" | null,
     "name": <stringa|null>,
@@ -36,13 +37,13 @@ Default: `types` vuoto = tutti i tipi; `sort` = "elevation_desc"; `limit` = 50; 
 - via ferrata, vie ferrate, ferrata, ferrate, sentiero attrezzato → `ferrata`
 - (i sentieri/trail NON sono supportati: non includerli)
 
-## Quota / altitudine → elevation
+## Quota / altitudine → minElevation / maxElevation
 
-- "sopra/oltre/più di/da … in su N m", "almeno N", "> N" → `elevation.min = N`
-- "sotto/meno di/fino a N m", "< N" → `elevation.max = N`
-- "tra N e M", "da N a M" → `elevation.min = N`, `elevation.max = M`
+- "sopra/oltre/più di/da … in su N m", "almeno N", "> N" → `minElevation = N`
+- "sotto/meno di/fino a N m", "< N" → `maxElevation = N`
+- "tra N e M", "da N a M" → `minElevation = N`, `maxElevation = M`
 - "N m s.l.m." è solo l'unità (slm = sul livello del mare), non un filtro a sé.
-- Per un limite NON richiesto usa `null`, MAI `0` (es. "sopra i 2000m" → `{"min":2000,"max":null}`).
+- Per un limite NON richiesto usa `null`, MAI `0` (es. "sopra i 2000m" → `{"minElevation":2000,"maxElevation":null}`).
 
 ## Area geografica → area
 
@@ -87,16 +88,16 @@ metti il frammento in `nameContains`.
 ## Esempi (input → output)
 
 Input: "bivacchi sopra i 3000m di altitudine"
-{"types":["bivouac"],"elevation":{"min":3000,"max":null},"area":null,"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
+{"types":["bivouac"],"minElevation":3000,"maxElevation":null,"area":null,"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
 
 Input: "rifugi sopra i 2000m in bergamasca"
-{"types":["hut"],"elevation":{"min":2000,"max":null},"area":{"kind":"province","name":"Bergamo","bbox":null},"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
+{"types":["hut"],"minElevation":2000,"maxElevation":null,"area":{"kind":"province","name":"Bergamo","bbox":null},"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
 
 Input: "vie ferrate in provincia di lecco"
-{"types":["ferrata"],"elevation":null,"area":{"kind":"province","name":"Lecco","bbox":null},"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
+{"types":["ferrata"],"minElevation":null,"maxElevation":null,"area":{"kind":"province","name":"Lecco","bbox":null},"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
 
 Input: "pizzi/vette sopra i 2700m slm"
-{"types":["peak"],"elevation":{"min":2700,"max":null},"area":null,"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
+{"types":["peak"],"minElevation":2700,"maxElevation":null,"area":null,"difficulty":null,"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
 
 Input: "ferrate difficili in questa zona"
-{"types":["ferrata"],"elevation":null,"area":{"kind":"viewport","name":null,"bbox":null},"difficulty":{"viaFerrataScale":{"min":"D","max":"F"},"sacScale":[]},"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}
+{"types":["ferrata"],"minElevation":null,"maxElevation":null,"area":{"kind":"viewport","name":null,"bbox":null},"difficulty":{"viaFerrataScale":{"min":"D","max":"F"},"sacScale":[]},"nameContains":null,"sort":"elevation_desc","limit":50,"offset":0}

@@ -36,7 +36,8 @@ function poolQuery(): ReturnType<typeof vi.fn> {
 
 const baseFilter: SearchFilter = {
   types: ['hut'],
-  elevation: { min: 2000, max: null },
+  minElevation: 2000,
+  maxElevation: null,
   area: { kind: 'province', name: 'Bergamo' },
   difficulty: null,
   nameContains: null,

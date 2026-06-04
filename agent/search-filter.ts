@@ -4,7 +4,6 @@ import { AI_MODELS, callAiModel, shouldCascade } from './orchestrator';
 import type {
   AreaKind,
   DifficultyFilter,
-  ElevationRange,
   SearchArea,
   SearchableType,
   SearchFilter,
@@ -80,16 +79,16 @@ export function validateFilter(raw: unknown): SearchFilter {
     ? [...new Set(obj.types.filter((t): t is SearchableType => typeof t === 'string' && SEARCHABLE_TYPES.has(t as SearchableType)))]
     : [];
 
-  let elevation: ElevationRange | null = null;
   const elev = asRecord(obj.elevation);
   // Elevations are positive metres. Treat 0/negative bounds as "absent" — models often
   // emit max:0 as a "no upper bound" sentinel — and drop a max that sits below the min.
-  let elevMin = finiteOrNull(elev.min);
-  let elevMax = finiteOrNull(elev.max);
+  const rawMin = Object.prototype.hasOwnProperty.call(obj, 'minElevation') ? obj.minElevation : elev.min;
+  const rawMax = Object.prototype.hasOwnProperty.call(obj, 'maxElevation') ? obj.maxElevation : elev.max;
+  let elevMin = finiteOrNull(rawMin);
+  let elevMax = finiteOrNull(rawMax);
   if (elevMin != null && elevMin <= 0) elevMin = null;
   if (elevMax != null && elevMax <= 0) elevMax = null;
   if (elevMin != null && elevMax != null && elevMin > elevMax) elevMax = null;
-  if (elevMin != null || elevMax != null) elevation = { min: elevMin, max: elevMax };
 
   let area: SearchArea | null = null;
   const rawArea = asRecord(obj.area);
@@ -131,7 +130,8 @@ export function validateFilter(raw: unknown): SearchFilter {
 
   return {
     types,
-    elevation,
+    minElevation: elevMin,
+    maxElevation: elevMax,
     area,
     difficulty,
     nameContains: trimmedOrNull(obj.nameContains),

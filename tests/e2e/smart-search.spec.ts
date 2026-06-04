@@ -2,7 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 const FILTER = {
   types: ['hut'],
-  elevation: { min: 2000, max: null },
+  minElevation: 2000,
+  maxElevation: null,
   area: { kind: 'province', name: 'Bergamo' },
   difficulty: null,
   nameContains: null,

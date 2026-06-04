@@ -22,7 +22,7 @@ describe('buildSearchQuery', () => {
   });
 
   it('applies an elevation floor and excludes ferrata when elevation is set', () => {
-    const { sql, params } = buildSearchQuery(mk({ elevation: { min: 3000 } }));
+    const { sql, params } = buildSearchQuery(mk({ minElevation: 3000 }));
     const f = flat(sql);
     expect(f).toContain('elevation >= $2'); // $1 = poi types
     expect(f).not.toContain('ferrata_matches');
@@ -31,7 +31,7 @@ describe('buildSearchQuery', () => {
   });
 
   it('bivacchi sopra 3000 → bivouac + elevation >= 3000', () => {
-    const { sql, params } = buildSearchQuery(mk({ types: ['bivouac'], elevation: { min: 3000 } }));
+    const { sql, params } = buildSearchQuery(mk({ types: ['bivouac'], minElevation: 3000 }));
     const f = flat(sql);
     expect(f).toContain('type = ANY($1)');
     expect(f).toContain('elevation >= $2');
@@ -40,14 +40,14 @@ describe('buildSearchQuery', () => {
   });
 
   it('applies an elevation ceiling with <=', () => {
-    const { sql, params } = buildSearchQuery(mk({ types: ['hut'], elevation: { max: 1500 } }));
+    const { sql, params } = buildSearchQuery(mk({ types: ['hut'], maxElevation: 1500 }));
     expect(flat(sql)).toContain('elevation <= $2');
     expect(params).toContain(1500);
   });
 
   it('resolves a province area via ST_Intersects against admin_areas', () => {
     const { sql, params } = buildSearchQuery(
-      mk({ types: ['hut'], elevation: { min: 2000 }, area: { kind: 'province', name: 'Bergamo' } }),
+      mk({ types: ['hut'], minElevation: 2000, area: { kind: 'province', name: 'Bergamo' } }),
     );
     const f = flat(sql);
     expect(f).toContain('ST_Intersects(geom, (SELECT geom FROM admin_areas WHERE kind = $');
@@ -97,7 +97,7 @@ describe('buildSearchQuery', () => {
   });
 
   it('returns a zero-row query when only ferrata is requested with an elevation filter', () => {
-    const { sql, params } = buildSearchQuery(mk({ types: ['ferrata'], elevation: { min: 2000 } }));
+    const { sql, params } = buildSearchQuery(mk({ types: ['ferrata'], minElevation: 2000 }));
     expect(flat(sql)).toContain('WHERE false');
     expect(params).toEqual([]);
   });

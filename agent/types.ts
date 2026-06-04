@@ -240,11 +240,6 @@ export interface SearchArea {
   bbox?: [number, number, number, number] | null;
 }
 
-export interface ElevationRange {
-  min?: number | null;
-  max?: number | null;
-}
-
 /** Via ferrata difficulty grade range. 1..6 inputs are normalized to A..F. */
 export interface FerrataScaleRange {
   min?: string | null;
@@ -259,7 +254,8 @@ export interface DifficultyFilter {
 export interface SearchFilter {
   /** Empty array = all searchable types. */
   types: SearchableType[];
-  elevation?: ElevationRange | null;
+  minElevation?: number | null;
+  maxElevation?: number | null;
   area?: SearchArea | null;
   difficulty?: DifficultyFilter | null;
   nameContains?: string | null;

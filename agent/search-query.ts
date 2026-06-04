@@ -63,8 +63,8 @@ export function buildSearchQuery(filter: SearchFilter): BuiltQuery {
   const poiTypes = wanted.filter((t) => t !== 'ferrata');
   const wantFerrata = wanted.includes('ferrata');
 
-  const elevMin = filter.elevation?.min ?? null;
-  const elevMax = filter.elevation?.max ?? null;
+  const elevMin = filter.minElevation ?? null;
+  const elevMax = filter.maxElevation ?? null;
   const hasElevation = elevMin != null || elevMax != null;
 
   // Spatial predicate shared by every branch. Points and lines both work with

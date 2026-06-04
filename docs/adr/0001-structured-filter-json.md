@@ -27,5 +27,5 @@ parameter (`$n`).
 - **Cacheable & paginatable** — the filter is a small serializable artifact, so pagination replays it
   with no second LLM call, and identical queries hit a 6h translation cache.
 - **Testable** — the query builder is a pure function (15 unit tests); the validator is unit-tested.
-- **Cost** — only filters expressible in the schema are supported (type, elevation, area, difficulty,
+- **Cost** — only filters expressible in the schema are supported (type, minElevation/maxElevation, area, difficulty,
   name). Exotic questions need a schema extension — an accepted trade-off for safety and reliability.

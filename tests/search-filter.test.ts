@@ -71,19 +71,27 @@ describe('validateFilter', () => {
   });
 
   it('drops a non-finite elevation', () => {
-    expect(validateFilter({ elevation: { min: 'abc' } }).elevation).toBeNull();
+    const f = validateFilter({ minElevation: 'abc' });
+    expect(f.minElevation).toBeNull();
+    expect(f.maxElevation).toBeNull();
   });
 
   it('treats a 0 elevation max as "no upper bound" (common LLM sentinel)', () => {
-    expect(validateFilter({ elevation: { min: 2000, max: 0 } }).elevation).toEqual({ min: 2000, max: null });
+    const f = validateFilter({ minElevation: 2000, maxElevation: 0 });
+    expect(f.minElevation).toBe(2000);
+    expect(f.maxElevation).toBeNull();
   });
 
   it('treats a 0 or negative elevation min as "no lower bound"', () => {
-    expect(validateFilter({ elevation: { min: 0, max: 1500 } }).elevation).toEqual({ min: null, max: 1500 });
+    const f = validateFilter({ minElevation: 0, maxElevation: 1500 });
+    expect(f.minElevation).toBeNull();
+    expect(f.maxElevation).toBe(1500);
   });
 
   it('drops a contradictory max below min, keeping the floor', () => {
-    expect(validateFilter({ elevation: { min: 3000, max: 2000 } }).elevation).toEqual({ min: 3000, max: null });
+    const f = validateFilter({ minElevation: 3000, maxElevation: 2000 });
+    expect(f.minElevation).toBe(3000);
+    expect(f.maxElevation).toBeNull();
   });
 });
 
@@ -101,11 +109,12 @@ describe('parseFilterJson', () => {
 describe('translateQuery', () => {
   it('translates a query into a validated filter', async () => {
     mockedCall.mockResolvedValueOnce(
-      '{"types":["hut"],"elevation":{"min":2000},"area":{"kind":"province","name":"Bergamo"}}',
+      '{"types":["hut"],"minElevation":2000,"area":{"kind":"province","name":"Bergamo"}}',
     );
     const { filter, modelUsed, fromCache } = await translateQuery('rifugi sopra i 2000m in bergamasca');
     expect(filter.types).toEqual(['hut']);
-    expect(filter.elevation).toEqual({ min: 2000, max: null });
+    expect(filter.minElevation).toBe(2000);
+    expect(filter.maxElevation).toBeNull();
     expect(filter.area).toEqual({ kind: 'province', name: 'Bergamo' });
     expect(modelUsed).toBe('Model 1');
     expect(fromCache).toBe(false);
@@ -127,7 +136,7 @@ describe('translateQuery', () => {
   });
 
   it('caches the translation: a normalized-equal query skips the model', async () => {
-    mockedCall.mockResolvedValueOnce('{"types":["peak"],"elevation":{"min":2700}}');
+    mockedCall.mockResolvedValueOnce('{"types":["peak"],"minElevation":2700}');
     const first = await translateQuery('pizzi sopra i 2700m');
     const second = await translateQuery('Pizzi  sopra i 2700m'); // case + spacing variant
     expect(first.fromCache).toBe(false);
