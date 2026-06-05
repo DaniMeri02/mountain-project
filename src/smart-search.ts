@@ -1,6 +1,6 @@
 import type mapboxgl from 'mapbox-gl';
 import { updatePanel, closePanel, patchPoiElevation, type PanelProps } from './ui';
-import { setSearchResultMarkers, clearSearchResultMarkers } from './map';
+import { setSearchResultMarkers, clearSearchResultMarkers, setResultMarkerClickHandler } from './map';
 import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
 import { appState } from './state';
 
@@ -315,5 +315,11 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
       return;
     }
     injectBackButton();
+  });
+
+  // Clicking a result marker on the map opens that result (same as clicking its list row).
+  // Registered via map.ts so the listener binds at layer-creation time.
+  setResultMarkerClickHandler((idx) => {
+    if (idx >= 0 && idx < results.length) void selectResult(results[idx]);
   });
 }

@@ -536,6 +536,12 @@ export function setupMapInteractivity(map: mapboxgl.Map): void {
       : [];
     if (poiAtPoint.length > 0) return;
 
+    // A click on a smart-search result marker is handled by its own layer listener.
+    if (map.getLayer('search-results-circles')) {
+      const resultHit = map.queryRenderedFeatures(e.point, { layers: ['search-results-circles'] });
+      if (resultHit.length > 0) return;
+    }
+
     const coordinates = { lng: e.lngLat.lng, lat: e.lngLat.lat };
 
     // Routing mode click is handled by mode.js — skip panel update.
@@ -675,6 +681,14 @@ export interface SearchResultPoint {
   lat: number;
 }
 
+// Click handler for result markers, set by the smart-search controller. Stored here so the
+// listener can be bound once, at layer-creation time (the layer is created lazily).
+let onResultMarkerClick: ((idx: number) => void) | null = null;
+
+export function setResultMarkerClickHandler(handler: (idx: number) => void): void {
+  onResultMarkerClick = handler;
+}
+
 function ensureSearchResultLayer(map: mapboxgl.Map): void {
   if (!map.getSource('search-results-src')) {
     map.addSource('search-results-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -692,6 +706,12 @@ function ensureSearchResultLayer(map: mapboxgl.Map): void {
         'circle-opacity': 0.9,
       },
     });
+    map.on('mouseenter', 'search-results-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'search-results-circles', () => { map.getCanvas().style.cursor = ''; });
+    map.on('click', 'search-results-circles', (e) => {
+      const idx = Number(e.features?.[0]?.properties?.idx);
+      if (onResultMarkerClick && Number.isInteger(idx)) onResultMarkerClick(idx);
+    });
   }
 }
 
@@ -703,10 +723,10 @@ export function setSearchResultMarkers(map: mapboxgl.Map, points: SearchResultPo
 
   src.setData({
     type: 'FeatureCollection',
-    features: points.map((p) => ({
+    features: points.map((p, i) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-      properties: {},
+      properties: { idx: i }, // index into the result set — used by the click handler
     })),
   });
 

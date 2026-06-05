@@ -172,3 +172,41 @@ test.describe('offline mode (B2)', () => {
     expect(pointerEvents).toBe('none');
   });
 });
+
+test.describe('clickable result markers (U2)', () => {
+  test('clicking a result marker opens that result', async ({ page }) => {
+    await stubSmartSearch(page);
+    await runSearch(page);
+
+    // Let fitBounds (800ms) finish, then click an actually-rendered marker at its true viewport
+    // pixel (project() is container-relative, so add the container's bounding-rect offset).
+    await page.waitForTimeout(1200);
+    const pt = await page.evaluate(() => {
+      const w = window as unknown as {
+        __debugMap?: {
+          queryRenderedFeatures: (opts: { layers: string[] }) => Array<{
+            geometry: { coordinates: [number, number] };
+            properties: Record<string, unknown>;
+          }>;
+          project: (c: [number, number]) => { x: number; y: number };
+          getContainer: () => HTMLElement;
+        };
+      };
+      const m = w.__debugMap;
+      if (!m) return null;
+      const feats = m.queryRenderedFeatures({ layers: ['search-results-circles'] });
+      if (feats.length === 0) return null;
+      const f = feats[0];
+      const [lng, lat] = f.geometry.coordinates;
+      const p = m.project([lng, lat]);
+      const rect = m.getContainer().getBoundingClientRect();
+      return { x: Math.round(rect.left + p.x), y: Math.round(rect.top + p.y), idx: Number(f.properties.idx) };
+    });
+    expect(pt).not.toBeNull();
+
+    await page.mouse.click(pt!.x, pt!.y);
+    const names = ['Rifugio Curò', 'Rifugio Coca', 'Rifugio Brunone'];
+    await expect(page.locator('#panel h2')).toHaveText(names[pt!.idx]);
+    await expect(page.locator('.results-back')).toBeVisible();
+  });
+});
