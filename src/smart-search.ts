@@ -2,6 +2,7 @@ import type mapboxgl from 'mapbox-gl';
 import { updatePanel, closePanel, patchPoiElevation, type PanelProps } from './ui';
 import { setSearchResultMarkers, clearSearchResultMarkers } from './map';
 import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
+import { appState } from './state';
 
 // Frontend-local DTO mirroring the server's PoiResult. The `filter` is opaque here —
 // we just echo it back for pagination so the server doesn't re-run the LLM.
@@ -233,6 +234,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   }
 
   async function run(query: string): Promise<void> {
+    if (appState.offlineMode) return; // offline = local IDB data only; smart search needs the server
     const q = query.trim();
     if (q.length < 2 || busy) return;
     busy = true;

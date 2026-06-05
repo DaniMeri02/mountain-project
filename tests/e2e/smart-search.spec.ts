@@ -160,3 +160,15 @@ test.describe('smart results mode (B1)', () => {
     expect(await markerCount(page)).toBe(3);
   });
 });
+
+test.describe('offline mode (B2)', () => {
+  test('the AI search button is non-interactive in offline mode', async ({ page }) => {
+    await page.goto('/');
+    await waitReady(page);
+    await page.evaluate(() => document.body.classList.add('offline-mode'));
+    const pointerEvents = await page
+      .locator('#ai-search-btn')
+      .evaluate((el) => getComputedStyle(el).pointerEvents);
+    expect(pointerEvents).toBe('none');
+  });
+});
