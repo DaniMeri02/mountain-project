@@ -1,7 +1,8 @@
 import mapboxgl from 'mapbox-gl';
 import { loadIcons } from './icons';
-import { updatePanel, updateCoordinatesPanel, closePanel, patchPoiElevation, patchCoordinatesElevation } from './ui';
-import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
+import { updateCoordinatesPanel, closePanel, patchCoordinatesElevation } from './ui';
+import { resolveElevationFromCoordinates } from './elevation';
+import { showPoiDetail } from './poi-detail';
 import { appState } from './state';
 
 // We store the current selection to know if 3D should be applied after a style loads
@@ -507,26 +508,24 @@ export function setupMapInteractivity(map: mapboxgl.Map): void {
   map.on('click', 'pois-points', (e) => {
     if (appState.routingMode || appState.routingViaMode) return;
     removeTransientClickMarker();
-    const panelToken = ++latestPanelUpdateToken;
 
     const feature = e.features && e.features[0];
     if (!feature) return;
 
     const coordinates = getFeatureCoordinates(feature, e.lngLat);
-    const properties = feature.properties ? { ...feature.properties } : {};
+    if (!coordinates) return;
+    const p = feature.properties ?? {};
 
-    // Render panel immediately so the click "responds" within the INP budget.
-    // Elevation, if missing, is fetched in the background and patched into the
-    // existing badge once the terrain tile resolves — no rebuild, no await chain.
-    void updatePanel(properties as Parameters<typeof updatePanel>[0], coordinates).then(() => {
-      if (!coordinates || hasValidElevationValue((properties as Record<string, unknown>).elevation)) {
-        return;
-      }
-      return resolveElevationFromCoordinates(map, coordinates).then((derivedElevation) => {
-        if (panelToken !== latestPanelUpdateToken) return;
-        patchPoiElevation(derivedElevation);
-      });
-    });
+    // Fire-and-forget so the click stays within the INP budget; showPoiDetail patches elevation
+    // in the background. fly:false — the POI is already under the cursor.
+    void showPoiDetail(map, {
+      name: typeof p.name === 'string' ? p.name : '',
+      type: typeof p.type === 'string' ? p.type : '',
+      lat: coordinates.lat,
+      lng: coordinates.lng,
+      elevation: (p.elevation as number | string | null | undefined) ?? null,
+      osm_id: (p.osm_id as number | string | null | undefined) ?? null,
+    }, { fly: false });
   });
 
   map.on('click', (e) => {

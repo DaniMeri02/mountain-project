@@ -1,7 +1,6 @@
-import mapboxgl from 'mapbox-gl';
-import { updatePanel, type PanelProps, type Coordinates } from './ui';
-import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
+import type mapboxgl from 'mapbox-gl';
 import { initSmartSearch } from './smart-search';
+import { showPoiDetail } from './poi-detail';
 
 interface SearchResult {
   name: string;
@@ -13,31 +12,6 @@ interface SearchResult {
   osm_id?: number | string;
   website?: string;
   description?: string;
-}
-
-let latestSearchSelectionToken = 0;
-
-function waitForMapSettle(map: mapboxgl.Map, timeoutMs = 1800): Promise<void> {
-  return new Promise((resolve) => {
-    let finished = false;
-
-    const finalize = () => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      map.off('moveend', onMoveEnd);
-      map.off('idle', onIdle);
-      resolve();
-    };
-
-    const onMoveEnd = () => finalize();
-    const onIdle = () => finalize();
-
-    map.on('moveend', onMoveEnd);
-    map.on('idle', onIdle);
-
-    const timer = setTimeout(finalize, timeoutMs);
-  });
 }
 
 export async function initSearch(map: mapboxgl.Map): Promise<void> {
@@ -143,45 +117,10 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
   }
 
   async function goToFeature(feat: SearchResult): Promise<void> {
-    const selectionToken = ++latestSearchSelectionToken;
     searchBox.value = feat.name;
     searchResults.innerHTML = '';
     searchResults.style.display = 'none';
-
-    const coordinates: Coordinates | null =
-      Number.isFinite(Number(feat.lat)) && Number.isFinite(Number(feat.lng))
-        ? { lat: Number(feat.lat), lng: Number(feat.lng) }
-        : null;
-
-    map.flyTo({
-      center: [feat.lng, feat.lat],
-      zoom: 16,
-      speed: 1.5,
-      essential: true
-    });
-
-    const panelProps: PanelProps = feat.type === 'ferrata'
-      ? {
-          ...feat,
-          elevation: feat.via_ferrata_scale ? `Scale ${feat.via_ferrata_scale}` : null,
-          description: 'Via ferrata route segment.',
-          website: ''
-        }
-      : { ...feat };
-
-    updatePanel(panelProps, coordinates);
-
-    if (!coordinates || hasValidElevationValue(panelProps.elevation)) {
-      return;
-    }
-
-    await waitForMapSettle(map);
-    const derivedElevation = await resolveElevationFromCoordinates(map, coordinates as { lat: number; lng: number });
-    if (selectionToken !== latestSearchSelectionToken || derivedElevation === null) {
-      return;
-    }
-
-    updatePanel({ ...panelProps, elevation: derivedElevation }, coordinates);
+    await showPoiDetail(map, feat);
   }
 
   searchBox.addEventListener('input', (e) => {

@@ -1,8 +1,8 @@
 import type mapboxgl from 'mapbox-gl';
-import { updatePanel, closePanel, patchPoiElevation, type PanelProps } from './ui';
+import { closePanel } from './ui';
 import { setSearchResultMarkers, clearSearchResultMarkers, setResultMarkerClickHandler } from './map';
-import { hasValidElevationValue, resolveElevationFromCoordinates } from './elevation';
 import { appState } from './state';
+import { showPoiDetail } from './poi-detail';
 
 // Frontend-local DTO mirroring the server's PoiResult. The `filter` is opaque here —
 // we just echo it back for pagination so the server doesn't re-run the LLM.
@@ -216,28 +216,8 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   }
 
   async function selectResult(r: SmartResult): Promise<void> {
-    map.flyTo({ center: [r.lng, r.lat], zoom: 15, speed: 1.4, essential: true });
-    const coords = { lat: r.lat, lng: r.lng };
-    const props: PanelProps =
-      r.type === 'ferrata'
-        ? {
-            name: r.name,
-            type: r.type,
-            elevation: r.via_ferrata_scale ? `Grade ${r.via_ferrata_scale}` : null,
-            via_ferrata_scale: r.via_ferrata_scale,
-            description: 'Via ferrata route segment.',
-            osm_id: r.osm_id,
-            website: '',
-          }
-        : { name: r.name, type: r.type, elevation: r.elevation, osm_id: r.osm_id };
-
-    await updatePanel(props, coords);
     // '← Results' is injected by the panel:updated listener while results mode is active.
-
-    if (r.type !== 'ferrata' && !hasValidElevationValue(r.elevation)) {
-      const derived = await resolveElevationFromCoordinates(map, coords);
-      patchPoiElevation(derived);
-    }
+    await showPoiDetail(map, r);
   }
 
   async function run(query: string): Promise<void> {
