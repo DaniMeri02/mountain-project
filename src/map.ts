@@ -684,6 +684,7 @@ export interface SearchResultPoint {
 // Click handler for result markers, set by the smart-search controller. Stored here so the
 // listener can be bound once, at layer-creation time (the layer is created lazily).
 let onResultMarkerClick: ((idx: number) => void) | null = null;
+let searchHandlersBound = false;
 
 export function setResultMarkerClickHandler(handler: (idx: number) => void): void {
   onResultMarkerClick = handler;
@@ -706,17 +707,22 @@ function ensureSearchResultLayer(map: mapboxgl.Map): void {
         'circle-opacity': 0.9,
       },
     });
+  }
+  // Bind interaction handlers once per map. They are delegated by layer id, so they survive the
+  // layer being destroyed + re-created across basemap (setStyle) switches — re-binding would dupe.
+  if (!searchHandlersBound) {
     map.on('mouseenter', 'search-results-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'search-results-circles', () => { map.getCanvas().style.cursor = ''; });
     map.on('click', 'search-results-circles', (e) => {
       const idx = Number(e.features?.[0]?.properties?.idx);
       if (onResultMarkerClick && Number.isInteger(idx)) onResultMarkerClick(idx);
     });
+    searchHandlersBound = true;
   }
 }
 
 /** Replace the highlighted result set and frame it (flyTo for one, fitBounds for many). */
-export function setSearchResultMarkers(map: mapboxgl.Map, points: SearchResultPoint[]): void {
+export function setSearchResultMarkers(map: mapboxgl.Map, points: SearchResultPoint[], fit = true): void {
   ensureSearchResultLayer(map);
   const src = map.getSource('search-results-src') as mapboxgl.GeoJSONSource | undefined;
   if (!src) return;
@@ -730,7 +736,7 @@ export function setSearchResultMarkers(map: mapboxgl.Map, points: SearchResultPo
     })),
   });
 
-  if (points.length === 0) return;
+  if (!fit || points.length === 0) return;
   if (points.length === 1) {
     map.flyTo({ center: [points[0].lng, points[0].lat], zoom: 13, essential: true });
     return;

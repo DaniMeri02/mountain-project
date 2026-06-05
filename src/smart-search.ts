@@ -331,4 +331,12 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   setResultMarkerClickHandler((idx) => {
     if (idx >= 0 && idx < results.length) void selectResult(results[idx]);
   });
+
+  // Basemap switches (setStyle) wipe custom layers; re-assert the markers (without re-framing the
+  // map) once the new style has loaded, so the result set survives a basemap change.
+  map.on('style.load', () => {
+    if (resultsActive && results.length > 0) {
+      setSearchResultMarkers(map, results.map((r) => ({ lng: r.lng, lat: r.lat })), false);
+    }
+  });
 }

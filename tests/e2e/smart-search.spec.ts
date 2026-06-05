@@ -211,6 +211,26 @@ test.describe('clickable result markers (U2)', () => {
   });
 });
 
+test.describe('result markers survive basemap switch', () => {
+  test('markers persist when switching basemap and back', async ({ page }) => {
+    await stubSmartSearch(page);
+    await runSearch(page);
+    expect(await markerCount(page)).toBe(3);
+
+    await page.click('#nav-burger'); // open the drawer (stays open on desktop)
+
+    // Switch to OSM raster — setStyle wipes custom layers; markers must be re-asserted.
+    await page.click('#osm');
+    await page.waitForTimeout(2000); // style.load + re-assert
+    expect(await markerCount(page)).toBe(3);
+
+    // …and back to the first style.
+    await page.click('#outdoors-v12');
+    await page.waitForTimeout(2000);
+    expect(await markerCount(page)).toBe(3);
+  });
+});
+
 test.describe('busy state (U3)', () => {
   test('the search button shows a busy state during the request', async ({ page }) => {
     await page.route('**/api/search/smart', async (route) => {
