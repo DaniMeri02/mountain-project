@@ -45,7 +45,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   let modelUsed: string | undefined;
   let busy = false;
   // Sticky "smart results mode": once a search runs, markers + a way back to the list
-  // persist across any panel the user opens, until they click 'Esci'.
+  // persist across any panel the user opens, until they click 'Exit'.
   let resultsActive = false;
 
   function viewportBbox(): [number, number, number, number] | undefined {
@@ -77,8 +77,8 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'results-exit';
-    btn.textContent = 'Esci';
-    btn.setAttribute('aria-label', 'Chiudi risultati');
+    btn.textContent = 'Exit';
+    btn.setAttribute('aria-label', 'Close results');
     btn.addEventListener('click', exitResults);
     return btn;
   }
@@ -104,7 +104,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
 
   function metaText(r: SmartResult): string {
     if (r.type === 'ferrata') {
-      return r.via_ferrata_scale ? `Via ferrata · scala ${r.via_ferrata_scale}` : 'Via ferrata';
+      return r.via_ferrata_scale ? `Via ferrata · grade ${r.via_ferrata_scale}` : 'Via ferrata';
     }
     const parts = [capitalize(r.type)];
     if (typeof r.elevation === 'number' && r.elevation > 0) parts.push(`${r.elevation} m`);
@@ -152,23 +152,23 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const titleRow = document.createElement('div');
     titleRow.className = 'results-title-row';
     const h = document.createElement('h2');
-    h.textContent = 'Risultati';
+    h.textContent = 'Results';
     titleRow.append(h, makeExitButton());
     const count = document.createElement('p');
     count.className = 'results-count';
     count.textContent =
       total === 0
-        ? 'Nessun risultato'
+        ? 'No results'
         : total > results.length
-          ? `Mostrando ${results.length} di ${total}`
-          : `${total} ${total === 1 ? 'risultato' : 'risultati'}`;
+          ? `Showing ${results.length} of ${total}`
+          : `${total} ${total === 1 ? 'result' : 'results'}`;
     header.append(titleRow, count);
     panel.appendChild(header);
 
     if (results.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'results-empty';
-      empty.textContent = 'Nessun luogo corrisponde. Prova ad allargare i criteri.';
+      empty.textContent = 'No place matches. Try widening the criteria.';
       panel.appendChild(empty);
       openPanel();
       return;
@@ -183,7 +183,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
       const more = document.createElement('button');
       more.type = 'button';
       more.className = 'results-more';
-      more.textContent = 'Carica altri';
+      more.textContent = 'Load more';
       more.addEventListener('click', () => void loadMore());
       panel.appendChild(more);
     }
@@ -203,7 +203,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'results-back';
-    back.textContent = '← Risultati';
+    back.textContent = '← Results';
     back.addEventListener('click', () => renderResults());
     panel.insertBefore(back, panel.firstChild);
   }
@@ -216,16 +216,16 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
         ? {
             name: r.name,
             type: r.type,
-            elevation: r.via_ferrata_scale ? `Scala ${r.via_ferrata_scale}` : null,
+            elevation: r.via_ferrata_scale ? `Grade ${r.via_ferrata_scale}` : null,
             via_ferrata_scale: r.via_ferrata_scale,
-            description: 'Tratto di via ferrata.',
+            description: 'Via ferrata route segment.',
             osm_id: r.osm_id,
             website: '',
           }
         : { name: r.name, type: r.type, elevation: r.elevation, osm_id: r.osm_id };
 
     await updatePanel(props, coords);
-    // '← Risultati' is injected by the panel:updated listener while results mode is active.
+    // '← Results' is injected by the panel:updated listener while results mode is active.
 
     if (r.type !== 'ferrata' && !hasValidElevationValue(r.elevation)) {
       const derived = await resolveElevationFromCoordinates(map, coords);
@@ -238,7 +238,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const q = query.trim();
     if (q.length < 2 || busy) return;
     busy = true;
-    renderSingle(`Interpreto: “${q}”…`, 'Ricerca intelligente', true);
+    renderSingle(`Interpreting: “${q}”…`, 'Smart search', true);
     try {
       const res = await fetch('/api/search/smart', {
         method: 'POST',
@@ -246,7 +246,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
         body: JSON.stringify({ q, viewport: viewportBbox() }),
       });
       if (res.status === 422) {
-        renderSingle('Non ho capito la domanda. Prova a riformularla.', 'Ricerca intelligente', false);
+        renderSingle("Couldn't understand the question. Try rephrasing it.", 'Smart search', false);
         return;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -259,7 +259,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
       setSearchResultMarkers(map, results.map((r) => ({ lng: r.lng, lat: r.lat })));
     } catch (err) {
       console.error('Smart search failed:', err);
-      renderSingle('Errore durante la ricerca. Riprova.', 'Ricerca intelligente', false);
+      renderSingle('Search failed. Please try again.', 'Smart search', false);
     } finally {
       busy = false;
     }
@@ -271,7 +271,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const moreBtn = panel?.querySelector('.results-more') as HTMLButtonElement | null;
     if (moreBtn) {
       moreBtn.disabled = true;
-      moreBtn.textContent = 'Caricamento…';
+      moreBtn.textContent = 'Loading…';
     }
     try {
       const res = await fetch('/api/search/smart', {
@@ -289,7 +289,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
       console.error('Load more failed:', err);
       if (moreBtn) {
         moreBtn.disabled = false;
-        moreBtn.textContent = 'Carica altri';
+        moreBtn.textContent = 'Load more';
       }
     } finally {
       busy = false;
@@ -303,8 +303,8 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   });
 
   // While results mode is active, any panel that ISN'T the results view (a POI detail, a
-  // map-click coordinates panel, a selected result) gets a '← Risultati' button so the user
-  // can always get back to the list. Markers + mode persist until 'Esci' (exitResults).
+  // map-click coordinates panel, a selected result) gets a '← Results' button so the user
+  // can always get back to the list. Markers + mode persist until 'Exit' (exitResults).
   window.addEventListener('panel:updated', () => {
     if (!resultsActive || !panel) return;
     if (

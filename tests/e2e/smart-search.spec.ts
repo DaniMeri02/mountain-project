@@ -61,7 +61,7 @@ async function runSearch(page: Page): Promise<void> {
   await page.fill('#search-box', 'rifugi sopra i 2000m in bergamasca');
   await page.click('#ai-search-btn');
   // Generous timeout: the first render after a cold Vite (re)compile can exceed the default.
-  await expect(page.locator('.results-count')).toHaveText('Mostrando 3 di 5', { timeout: 15000 });
+  await expect(page.locator('.results-count')).toHaveText('Showing 3 of 5', { timeout: 15000 });
 }
 
 test.describe('smart filtering search', () => {
@@ -93,10 +93,10 @@ test.describe('smart filtering search', () => {
     await expect(page.locator('.results-back')).toBeVisible();
 
     await page.locator('.results-back').click();
-    await expect(page.locator('.results-count')).toHaveText('Mostrando 3 di 5');
+    await expect(page.locator('.results-count')).toHaveText('Showing 3 of 5');
   });
 
-  test('"Carica altri" paginates by replaying the filter, not re-translating', async ({ page }) => {
+  test('"Load more" paginates by replaying the filter, not re-translating', async ({ page }) => {
     const calls = await stubSmartSearch(page);
     await runSearch(page);
 
@@ -119,7 +119,7 @@ test.describe('smart filtering search', () => {
     await waitReady(page);
     await page.fill('#search-box', 'qualcosa di incomprensibile');
     await page.click('#ai-search-btn');
-    await expect(page.locator('.results-empty')).toContainText('Non ho capito');
+    await expect(page.locator('.results-empty')).toContainText('understand');
   });
 });
 
@@ -133,7 +133,7 @@ async function markerCount(page: Page): Promise<number> {
 }
 
 test.describe('smart results mode (B1)', () => {
-  test('markers + back button persist across a map-click panel; Esci clears', async ({ page }) => {
+  test('markers + back button persist across a map-click panel; Exit clears', async ({ page }) => {
     await stubSmartSearch(page);
     await runSearch(page);
     expect(await markerCount(page)).toBe(3);
@@ -147,13 +147,13 @@ test.describe('smart results mode (B1)', () => {
     await page.locator('.results-back').click();
     await expect(page.locator('.results-count')).toBeVisible();
 
-    // Esci → markers cleared, list gone.
+    // Exit → markers cleared, list gone.
     await page.locator('.results-exit').click();
     await expect(page.locator('.results-list')).toHaveCount(0);
     expect(await markerCount(page)).toBe(0);
   });
 
-  test('Escape closes the panel but keeps results mode (markers persist until Esci)', async ({ page }) => {
+  test('Escape closes the panel but keeps results mode (markers persist until Exit)', async ({ page }) => {
     await stubSmartSearch(page);
     await runSearch(page);
     await page.keyboard.press('Escape');
