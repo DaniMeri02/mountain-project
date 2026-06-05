@@ -4,11 +4,12 @@ import { addMapLayers, setupMapInteractivity, setupStyleSwitcher, fetchDynamicDa
 import { initSearch } from './search';
 import { initOfflineModule } from './offline/index';
 import { initRoutingModule } from './routing/index';
-import { closePanel } from './ui';
+import { closePanel, initPanel, isPanelOpen } from './panel';
 import { initNav } from './nav';
 import { appState } from './state';
 
 initNav();
+initPanel();
 
 if (import.meta.env.DEV) {
   import('web-vitals/attribution').then(({ onINP }) => {
@@ -33,7 +34,7 @@ if (import.meta.env.DEV) {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.body.classList.contains('panel-open')) {
+  if (e.key === 'Escape' && isPanelOpen()) {
     closePanel();
   }
 });

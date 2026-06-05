@@ -1,5 +1,5 @@
 import type mapboxgl from 'mapbox-gl';
-import { closePanel } from './ui';
+import { closePanel, openPanel as showPanel } from './panel';
 import { setSearchResultMarkers, clearSearchResultMarkers, setResultMarkerClickHandler } from './map';
 import { appState } from './state';
 import { showPoiDetail } from './poi-detail';
@@ -61,7 +61,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   }
 
   function openPanel(): void {
-    document.body.classList.add('panel-open');
+    showPanel();
     window.dispatchEvent(new Event('panel:updated'));
   }
 
