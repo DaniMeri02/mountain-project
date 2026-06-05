@@ -43,6 +43,9 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   let total = 0;
   let modelUsed: string | undefined;
   let busy = false;
+  // Sticky "smart results mode": once a search runs, markers + a way back to the list
+  // persist across any panel the user opens, until they click 'Esci'.
+  let resultsActive = false;
 
   function viewportBbox(): [number, number, number, number] | undefined {
     const b = map.getBounds();
@@ -60,6 +63,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     total = 0;
     modelUsed = undefined;
     busy = false;
+    resultsActive = false;
   }
 
   function exitResults(): void {
@@ -78,19 +82,10 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     return btn;
   }
 
-  function makeCloseButton(): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.id = 'panel-close';
-    btn.setAttribute('aria-label', 'Chiudi');
-    btn.textContent = '×';
-    btn.addEventListener('click', exitResults);
-    return btn;
-  }
-
   function renderSingle(message: string, heading: string, loading: boolean): void {
     if (!panel) return;
+    resultsActive = true;
     panel.innerHTML = '';
-    panel.appendChild(makeCloseButton());
     const header = document.createElement('div');
     header.className = 'results-header';
     const titleRow = document.createElement('div');
@@ -148,8 +143,8 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
 
   function renderResults(): void {
     if (!panel) return;
+    resultsActive = true;
     panel.innerHTML = '';
-    panel.appendChild(makeCloseButton());
 
     const header = document.createElement('div');
     header.className = 'results-header';
@@ -229,7 +224,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
         : { name: r.name, type: r.type, elevation: r.elevation, osm_id: r.osm_id };
 
     await updatePanel(props, coords);
-    injectBackButton();
+    // '← Risultati' is injected by the panel:updated listener while results mode is active.
 
     if (r.type !== 'ferrata' && !hasValidElevationValue(r.elevation)) {
       const derived = await resolveElevationFromCoordinates(map, coords);
@@ -303,5 +298,20 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const dropdown = document.getElementById('search-results');
     if (dropdown) dropdown.style.display = 'none';
     void run(searchBox.value);
+  });
+
+  // While results mode is active, any panel that ISN'T the results view (a POI detail, a
+  // map-click coordinates panel, a selected result) gets a '← Risultati' button so the user
+  // can always get back to the list. Markers + mode persist until 'Esci' (exitResults).
+  window.addEventListener('panel:updated', () => {
+    if (!resultsActive || !panel) return;
+    if (
+      panel.querySelector('.results-list') ||
+      panel.querySelector('.results-exit') ||
+      panel.querySelector('.results-back')
+    ) {
+      return;
+    }
+    injectBackButton();
   });
 }

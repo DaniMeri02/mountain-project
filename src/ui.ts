@@ -359,6 +359,7 @@ export function updateCoordinatesPanel(lng: number, lat: number, elevation: numb
 
   attachPanelClose();
   openPanel();
+  window.dispatchEvent(new Event('panel:updated'));
 }
 
 // Targeted DOM patches — used to update a single field after the panel has
