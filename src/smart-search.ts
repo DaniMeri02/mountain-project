@@ -48,6 +48,13 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
   // persist across any panel the user opens, until they click 'Exit'.
   let resultsActive = false;
 
+  function setButtonBusy(b: boolean): void {
+    const btn = button as HTMLButtonElement;
+    btn.disabled = b;
+    btn.classList.toggle('is-busy', b);
+    btn.setAttribute('aria-busy', String(b));
+  }
+
   function viewportBbox(): [number, number, number, number] | undefined {
     const b = map.getBounds();
     return b ? [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] : undefined;
@@ -238,6 +245,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
     const q = query.trim();
     if (q.length < 2 || busy) return;
     busy = true;
+    setButtonBusy(true);
     renderSingle(`Interpreting: “${q}”…`, 'Smart search', true);
     try {
       const res = await fetch('/api/search/smart', {
@@ -262,6 +270,7 @@ export function initSmartSearch(map: mapboxgl.Map, searchBox: HTMLInputElement):
       renderSingle('Search failed. Please try again.', 'Smart search', false);
     } finally {
       busy = false;
+      setButtonBusy(false);
     }
   }
 

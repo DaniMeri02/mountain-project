@@ -210,3 +210,20 @@ test.describe('clickable result markers (U2)', () => {
     await expect(page.locator('.results-back')).toBeVisible();
   });
 });
+
+test.describe('busy state (U3)', () => {
+  test('the search button shows a busy state during the request', async ({ page }) => {
+    await page.route('**/api/search/smart', async (route) => {
+      await new Promise((r) => setTimeout(r, 600)); // hold the response so the busy state is observable
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PAGE1) });
+    });
+    await page.goto('/');
+    await waitReady(page);
+    await page.fill('#search-box', 'rifugi sopra i 2000m in bergamasca');
+    await page.click('#ai-search-btn');
+
+    await expect(page.locator('#ai-search-btn')).toHaveAttribute('aria-busy', 'true');
+    await expect(page.locator('.results-count')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#ai-search-btn')).toHaveAttribute('aria-busy', 'false');
+  });
+});
