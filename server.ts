@@ -2,13 +2,12 @@ import 'dotenv/config';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import path from 'path';
-import { Pool } from 'pg';
 import { AgentOrchestrator, AI_MODELS } from './agent/orchestrator';
 import { reloadPrompt } from './agent/prompt-loader';
 import { buildSearchQuery } from './agent/search-query';
 import { translateQuery, validateFilter } from './agent/search-filter';
 import type { PoiResult, PoiType, SearchFilter, SmartSearchResult } from './agent/types';
-import { isMissingTableError } from './db';
+import { createPool, isMissingTableError } from './db';
 import { resolveModelSlug } from './agent/model-slug';
 
 const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
@@ -56,13 +55,7 @@ export function parseBBox(query: BBoxQuery): ParsedBBox | null {
 for (const key of ['DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME'] as const) {
   if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
 }
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  database: process.env.DB_NAME,
-});
+const pool = createPool();
 
 const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 

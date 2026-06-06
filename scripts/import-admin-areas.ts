@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Pool } from 'pg';
+import { createPool } from '../db';
 
 // Free, stable GeoJSON of Italian administrative boundaries (EPSG:4326), names in Italian.
 // Source: openpolis/geojson-italy. Override via env if you mirror them locally.
@@ -18,13 +18,7 @@ interface GeoFeatureCollection {
   features: GeoFeature[];
 }
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  database: process.env.DB_NAME,
-});
+const pool = createPool();
 
 async function fetchCollection(url: string): Promise<GeoFeature[]> {
   const res = await fetch(url, { headers: { 'User-Agent': 'mountain-portal/1.0 (personal project)' } });

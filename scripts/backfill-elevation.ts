@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Pool } from 'pg';
+import { createPool } from '../db';
 
 // Batch point-elevation API (lat/lng → metres). OpenTopoData is free & keyless
 // (1 req/s, ≤100 points per call). Override the dataset/host with DEM_API_URL,
@@ -20,13 +20,7 @@ interface ElevationResponse {
   results?: ElevationResult[];
 }
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  database: process.env.DB_NAME,
-});
+const pool = createPool();
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];

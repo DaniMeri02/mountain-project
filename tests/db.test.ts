@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { isMissingTableError } from '../db';
+import { isMissingTableError, poolConfigFromEnv } from '../db';
+
+// The pool config is built from env vars in one place so the server and every script agree.
+// The key correctness point: an unset DB_PORT must become undefined, never NaN (the old
+// server.ts did Number(process.env.DB_PORT) and got NaN when the var was missing).
+describe('poolConfigFromEnv', () => {
+  it('maps env vars and parses DB_PORT to a number', () => {
+    const cfg = poolConfigFromEnv({
+      DB_USER: 'u', DB_PASSWORD: 'p', DB_HOST: 'h', DB_PORT: '5433', DB_NAME: 'd',
+    });
+    expect(cfg).toEqual({ user: 'u', password: 'p', host: 'h', port: 5433, database: 'd' });
+  });
+
+  it('leaves port undefined (not NaN) when DB_PORT is unset', () => {
+    const cfg = poolConfigFromEnv({ DB_USER: 'u' });
+    expect(cfg.port).toBeUndefined();
+  });
+
+  it('leaves port undefined when DB_PORT is empty', () => {
+    const cfg = poolConfigFromEnv({ DB_PORT: '' });
+    expect(cfg.port).toBeUndefined();
+  });
+});
 
 // 42P01 is Postgres' "undefined_table". The app treats it as "feature not migrated yet"
 // and degrades to an empty result set, so the predicate must recognise exactly that code

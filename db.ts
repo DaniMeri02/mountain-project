@@ -1,4 +1,22 @@
 // Database helpers shared by the server and scripts.
+import { Pool, type PoolConfig } from 'pg';
+
+/** Build the pg connection config from environment variables (one source of truth). */
+export function poolConfigFromEnv(env: NodeJS.ProcessEnv = process.env): PoolConfig {
+  return {
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    host: env.DB_HOST,
+    // Unset/empty DB_PORT must be undefined (pg falls back to 5432), never NaN.
+    port: env.DB_PORT ? Number(env.DB_PORT) : undefined,
+    database: env.DB_NAME,
+  };
+}
+
+/** Create a pg Pool from the environment, with optional per-caller overrides. */
+export function createPool(overrides: PoolConfig = {}): Pool {
+  return new Pool({ ...poolConfigFromEnv(), ...overrides });
+}
 
 /** Extract a Postgres error `code` if the value looks like a pg error, else undefined. */
 function getErrorCode(error: unknown): string | undefined {
