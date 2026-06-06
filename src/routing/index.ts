@@ -46,10 +46,12 @@ export function initRoutingModule(map: mapboxgl.Map): void {
   createReopenButton();
   if (import.meta.env.DEV) {
     (window as Window & { __debugRoute?: unknown }).__debugRoute = async (startCoord: Coord, endCoord: Coord) => {
-      await computeAndDisplayRoute(startCoord, endCoord);
+      const snapped = await computeAndDisplayRoute(startCoord, endCoord);
       return {
         altsFound: _alternatives.length,
         altDistances: _alternatives.map((alt) => Math.round(routeDistanceKm(alt) * 1000)),
+        fromCoord: snapped?.fromCoord,
+        toCoord: snapped?.toCoord,
       };
     };
   }
@@ -118,7 +120,7 @@ function attachFindRouteButton(): void {
   });
 }
 
-async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundTrip = false): Promise<void> {
+async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundTrip = false): Promise<{ fromCoord: Coord; toCoord: Coord } | null> {
   const hadRoute = appState.routingHasRoute;
   appState.routingHasRoute = false;
   _panelUserClosed = false;
@@ -155,13 +157,13 @@ async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundT
       roundTrip,
     });
 
-    if (response === null) return; // superseded by a newer request
+    if (response === null) return null; // superseded by a newer request
 
     if (response.kind === 'error') {
       console.error('Routing worker error:', response.message);
       showToast('Failed to compute route.');
       if (hadRoute) appState.routingHasRoute = true;
-      return;
+      return null;
     }
 
     const outcome = response.outcome;
@@ -170,26 +172,26 @@ async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundT
         clearRoutingMarkers();
         showToast('No trail data found in this area.');
         if (hadRoute) appState.routingHasRoute = true;
-        return;
+        return null;
       case 'no-start':
         clearRoutingMarkers();
         showToast('No trail nearby — click closer to a trail.');
         if (hadRoute) appState.routingHasRoute = true;
-        return;
+        return null;
       case 'no-end':
         clearRoutingMarkers();
         showToast('No trail nearby at end point — click closer to a trail.');
         if (hadRoute) appState.routingHasRoute = true;
-        return;
+        return null;
       case 'no-via':
         showToast(`No trail nearby at pass-through point ${outcome.viaIdx + 1}.`);
         if (hadRoute) appState.routingHasRoute = true;
-        return;
+        return null;
       case 'no-route':
         clearRoutingMarkers();
         showToast('No route found between these points.');
         if (hadRoute) appState.routingHasRoute = true;
-        return;
+        return null;
       case 'ok': {
         setRoutingMarkers(_map!, outcome.fromCoord, outcome.toCoord);
 
@@ -212,7 +214,8 @@ async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundT
         } else {
           renderRoute();
         }
-        return;
+        // Return the snapped endpoints (clicked points pulled onto the trail graph).
+        return { fromCoord: outcome.fromCoord, toCoord: outcome.toCoord };
       }
     }
   } catch (err) {
@@ -220,6 +223,7 @@ async function computeAndDisplayRoute(startCoord: Coord, endCoord: Coord, roundT
     if (hadRoute) appState.routingHasRoute = true;
     showToast('Failed to compute route.');
   }
+  return null;
 }
 
 function renderRoute(): void {
