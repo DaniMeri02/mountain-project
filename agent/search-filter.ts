@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
 import { join } from 'path';
 import { AI_MODELS, callAiModel, shouldCascade } from './orchestrator';
+import { loadPrompt } from './prompt-loader';
 import type {
   AreaKind,
   DifficultyFilter,
@@ -10,19 +10,12 @@ import type {
   SortKey,
 } from './types';
 
-// ─── Editable prompt (mirrors prompt-loader.ts) ─────────────────────────────
+// ─── Editable prompt (ai-agent-conf/search-filter-prompt.md) ────────────────
 
 const PROMPT_PATH = join(process.cwd(), 'ai-agent-conf', 'search-filter-prompt.md');
-let cachedPrompt: string | null = null;
 
-export function loadSearchFilterPrompt(): string {
-  if (cachedPrompt !== null) return cachedPrompt;
-  cachedPrompt = readFileSync(PROMPT_PATH, 'utf-8');
-  return cachedPrompt;
-}
-
-export function reloadSearchFilterPrompt(): void {
-  cachedPrompt = null;
+function loadSearchFilterPrompt(): string {
+  return loadPrompt(PROMPT_PATH);
 }
 
 // ─── Allowed vocabularies ───────────────────────────────────────────────────
