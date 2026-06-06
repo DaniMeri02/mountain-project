@@ -11,3 +11,7 @@ agent-sources-dump.txt
 skills-lock.json
 test-results/
 playwright-report/
+# stray screenshots / images at repo root (visual-test artifacts belong in .playwright-mcp/)
+/*.png
+/*.jpeg
+/*.jpg
