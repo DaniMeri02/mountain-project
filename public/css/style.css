@@ -185,6 +185,15 @@
 #search-results li.active {
   background: rgba(46, 125, 50, 0.10);
 }
+#search-results li.search-hint {
+  color: var(--muted, #6b7280);
+  font-size: 0.9em;
+}
+#search-results li.search-hint .search-hint-action {
+  color: #2e7d32;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ---- Slide-in drawer ---- */
 .nav-drawer {

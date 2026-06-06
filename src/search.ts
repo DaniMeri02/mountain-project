@@ -123,28 +123,58 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
     await showPoiDetail(map, feat);
   }
 
-  searchBox.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value;
-    searchResults.innerHTML = '';
-    searchResults.style.display = 'none';
-    lastMatches = [];
+  // The ✨ button already runs smart (AI) search on the current input; the empty state reuses it.
+  function triggerSmartSearch(): void {
+    (document.getElementById('ai-search-btn') as HTMLButtonElement | null)?.click();
+  }
 
-    if (query.trim().length < 2) return;
+  // A non-result row: a message plus a clickable/keyboard-activatable action. Used for both the
+  // "no name match → try AI search" nudge and the "search unavailable → retry" error state.
+  function appendHintRow(message: string, actionLabel: string, onActivate: () => void): void {
+    const li = document.createElement('li');
+    li.className = 'search-hint';
+    li.setAttribute('role', 'option');
+    li.setAttribute('tabindex', '0');
+    li.appendChild(document.createTextNode(message));
+    const action = document.createElement('strong');
+    action.className = 'search-hint-action';
+    action.textContent = actionLabel;
+    li.appendChild(action);
+    li.addEventListener('click', onActivate);
+    li.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onActivate();
+      } else if (e.key === 'Escape') {
+        searchResults.innerHTML = '';
+        searchResults.style.display = 'none';
+        searchBox.focus();
+      }
+    });
+    searchResults.appendChild(li);
+  }
 
-    // Debounce the search to avoid hitting the DB on every single keystroke
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const matches = await res.json() as SearchResult[];
-        if (!Array.isArray(matches)) throw new Error('Unexpected search response shape');
-        lastMatches = matches;
-        highlightedIndex = -1;
+  async function runAutocomplete(query: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const matches = await res.json() as SearchResult[];
+      if (!Array.isArray(matches)) throw new Error('Unexpected search response shape');
+      lastMatches = matches;
+      highlightedIndex = -1;
+      searchResults.innerHTML = '';
 
-        if (matches.length > 0) {
-          searchResults.style.display = 'block';
-          matches.forEach(feat => {
+      if (matches.length === 0) {
+        // Shared input: a NL query ("bivacchi sopra 1500m") has no name match. Don't dead-end —
+        // point at smart search instead of leaving a silent empty dropdown.
+        searchResults.style.display = 'block';
+        appendHintRow(`No place named “${query.trim()}”. `, '✨ Ask AI search', triggerSmartSearch);
+        return;
+      }
+
+      {
+        searchResults.style.display = 'block';
+        matches.forEach(feat => {
             const li = document.createElement('li');
             const typeIcon = getTypeIcon(feat.type);
 
@@ -210,11 +240,27 @@ export async function initSearch(map: mapboxgl.Map): Promise<void> {
 
             searchResults.appendChild(li);
           });
-        }
-      } catch (err) {
-        console.error("Error searching PostGIS DB: ", err);
       }
-    }, 300);
+    } catch (err) {
+      console.error('Error searching PostGIS DB: ', err);
+      lastMatches = [];
+      searchResults.innerHTML = '';
+      searchResults.style.display = 'block';
+      appendHintRow('Search unavailable. ', 'Retry', () => { void runAutocomplete(query); });
+    }
+  }
+
+  searchBox.addEventListener('input', (e) => {
+    const query = (e.target as HTMLInputElement).value;
+    searchResults.innerHTML = '';
+    searchResults.style.display = 'none';
+    lastMatches = [];
+
+    if (query.trim().length < 2) return;
+
+    // Debounce to avoid hitting the DB on every keystroke
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { void runAutocomplete(query); }, 300);
   });
 
   searchBox.addEventListener('keydown', (e) => {
