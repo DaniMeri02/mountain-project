@@ -57,10 +57,16 @@ export function initNav(): void {
       if (items.length === 0) return;
       const first = items[0] as HTMLElement;
       const last = items[items.length - 1] as HTMLElement;
-      if (e.shiftKey && document.activeElement === first) {
+      const active = document.activeElement;
+      const insideDrawer = active instanceof Node && drawer!.contains(active);
+      if (!insideDrawer) {
+        // Focus escaped the drawer (e.g. a click landed elsewhere) — pull it back in.
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (e.shiftKey && active === first) {
         e.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+      } else if (!e.shiftKey && active === last) {
         e.preventDefault();
         first.focus();
       }
