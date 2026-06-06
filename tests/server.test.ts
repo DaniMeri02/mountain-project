@@ -121,6 +121,20 @@ describe('GET /api/search', () => {
   });
 });
 
+describe('POST /api/search/smart', () => {
+  // A non-finite viewport bound (1e400 parses to Infinity) must never reach PostGIS. The body
+  // schema already rejects it: ajv's number type excludes Infinity. Raw string payload so the
+  // JSON parser yields Infinity — an object payload would stringify it to null.
+  it('rejects a non-finite viewport bound at schema validation', async () => {
+    const res = await fastify.inject({
+      method: 'POST', url: '/api/search/smart',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"viewport":[1e400,45,10,46]}',
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 // ── POST routes ───────────────────────────────────────────────────────────────
 
 describe('POST /api/ai/research', () => {
