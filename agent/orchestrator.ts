@@ -10,9 +10,22 @@ import { fetchFerrate365Data } from './sources/ferrate365-scraper';
 import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
 import { fetchKomootData } from './sources/komoot';
+import { gatherSources, type NamedSource } from './sources/gather';
 // TripAdvisor (maxcopell~tripadvisor) charges per-run on top of compute units — disabled
 // Facebook (apify~facebook-posts/groups-scraper) — disabled: Apify credits exhausted
 import type { AgentInput, AgentResponse, SourceResult } from './types';
+
+// The sources consulted for every AI guide. The name attributes the result even when the
+// fetch throws, so a failed source is reported (not silently dropped) with its identity intact.
+const SOURCES: NamedSource[] = [
+  { name: 'Wikidata', fetch: fetchWikidata },
+  { name: 'OpenStreetMap', fetch: fetchOverpassData },
+  { name: 'Rifugi regionali', fetch: fetchRifugiData },
+  { name: 'Ferrate365', fetch: fetchFerrate365Data },
+  { name: 'YouTube', fetch: fetchYouTubeVideos },
+  { name: 'Reddit', fetch: fetchRedditPosts },
+  { name: 'Komoot', fetch: fetchKomootData },
+];
 
 export interface AiModel {
   slug: string;
@@ -241,21 +254,8 @@ export class AgentOrchestrator {
       }
     }
 
-    const settled = await Promise.allSettled([
-      fetchWikidata(input),
-      fetchOverpassData(input),
-      fetchRifugiData(input),
-      fetchFerrate365Data(input),
-      fetchYouTubeVideos(input),
-      fetchRedditPosts(input),
-      fetchKomootData(input),
-      // fetchFacebookPosts(input),  // disabled: Apify credits exhausted
-    ]);
-
-    const results: SourceResult[] = settled.map((outcome) =>
-      outcome.status === 'fulfilled'
-        ? outcome.value
-        : { sourceName: 'unknown', content: '', success: false },
+    const results: SourceResult[] = await gatherSources(SOURCES, input, (name, err) =>
+      console.error(`[${name}] source failed`, err),
     );
 
     const successfulSources = results.filter((r) => r.success).map((r) => r.sourceName);
