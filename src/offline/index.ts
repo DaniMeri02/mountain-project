@@ -3,6 +3,7 @@ import { getAllAreas, getArea, deleteArea, decrTileRefs } from './idb';
 import { openDownloadModal, downloadArea, showSuccess, hideProgress } from './download';
 import { isDrawing, startDrawMode, cancelDrawMode } from './draw-mode';
 import { openArea } from './area';
+import { tileCacheName } from './tile-cache';
 import { closeNav } from '../nav';
 
 export { tilesInBboxAtZoom, tileCountForRange, enumerateTiles } from '../tile-math';
@@ -64,8 +65,11 @@ async function removeArea(id: string): Promise<void> {
   if (!area) return;
   const tileUrls = Array.isArray(area.tileUrls) ? area.tileUrls : [];
   const evictable = await decrTileRefs(tileUrls);
-  if (evictable.length > 0) {
-    const cache = await caches.open('tiles-v1');
+  const cacheName = tileCacheName(area.basemap);
+  if (evictable.length > 0 && cacheName) {
+    // Tiles are cached by the service worker under the basemap's workbox cache — delete them
+    // there (the old 'tiles-v1' name matched no cache, so eviction silently did nothing).
+    const cache = await caches.open(cacheName);
     await Promise.all(evictable.map((url) => cache.delete(url).catch(() => false)));
   }
   await deleteArea(id);
