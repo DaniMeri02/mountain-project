@@ -9,6 +9,7 @@ import { buildSearchQuery } from './agent/search-query';
 import { translateQuery, validateFilter } from './agent/search-filter';
 import type { PoiResult, PoiType, SearchFilter, SmartSearchResult } from './agent/types';
 import { isMissingTableError } from './db';
+import { resolveModelSlug } from './agent/model-slug';
 
 const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
 
@@ -532,32 +533,20 @@ function getOrchestrator(): AgentOrchestrator {
   return orchestrator;
 }
 
-const VALID_MODEL_SLUGS = new Set(AI_MODELS.map((m) => m.slug));
-
-function resolveModelSlug(modelSlug: string | null | undefined, reply: { status: (n: number) => { send: (b: unknown) => unknown } }): string | undefined | null {
-  if (modelSlug == null) return undefined;
-  if (!VALID_MODEL_SLUGS.has(modelSlug)) {
-    reply.status(400).send({
-      error: 'Unknown modelSlug',
-      validSlugs: Array.from(VALID_MODEL_SLUGS),
-    });
-    return null;
-  }
-  return modelSlug;
-}
-
 fastify.post<{ Body: ResearchBody }>(
   '/api/ai/research',
   { schema: researchBodySchema },
   async (request, reply) => {
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
-    const resolvedSlug = resolveModelSlug(modelSlug, reply);
-    if (resolvedSlug === null) return;
+    const resolved = resolveModelSlug(modelSlug);
+    if (!resolved.ok) {
+      return reply.status(400).send({ error: 'Unknown modelSlug', validSlugs: resolved.validSlugs });
+    }
     try {
       return await getOrchestrator().generate(
         { name, type: type as PoiType, elevation, osm_id, lat, lng },
         false,
-        resolvedSlug,
+        resolved.slug,
       );
     } catch (error) {
       fastify.log.error(error);
@@ -571,13 +560,15 @@ fastify.post<{ Body: ResearchBody }>(
   { schema: researchBodySchema },
   async (request, reply) => {
     const { name, type, elevation, osm_id, lat, lng, modelSlug } = request.body;
-    const resolvedSlug = resolveModelSlug(modelSlug, reply);
-    if (resolvedSlug === null) return;
+    const resolved = resolveModelSlug(modelSlug);
+    if (!resolved.ok) {
+      return reply.status(400).send({ error: 'Unknown modelSlug', validSlugs: resolved.validSlugs });
+    }
     try {
       return await getOrchestrator().generate(
         { name, type: type as PoiType, elevation, osm_id, lat, lng },
         true,
-        resolvedSlug,
+        resolved.slug,
       );
     } catch (error) {
       fastify.log.error(error);
