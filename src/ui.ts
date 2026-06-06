@@ -37,6 +37,17 @@ function attachPanelClose(): void {
   if (closeBtn) closeBtn.addEventListener('click', closePanel);
 }
 
+// One owner for the detail-panel shell: inject the close button + the caller's body, wire the
+// close button, open the panel, and announce the update. Both panel renderers go through here.
+function renderPanel(bodyHtml: string): void {
+  const panel = document.getElementById('panel');
+  if (!panel) return;
+  panel.innerHTML = `<button id="panel-close" aria-label="Close details">×</button>${bodyHtml}`;
+  attachPanelClose();
+  openPanel();
+  window.dispatchEvent(new Event('panel:updated'));
+}
+
 function formatElevationLabel(elevation: string | number | null | undefined): string {
   const numericElevation = Number(elevation);
   if (Number.isFinite(numericElevation) && numericElevation > 0) {
@@ -117,7 +128,6 @@ fetchAiModels().catch(() => {}); // pre-warm on module load
 
 export async function updatePanel(props: PanelProps, coordinates: Coordinates | null): Promise<void> {
   const aiModels = await fetchAiModels();
-  const panel = document.getElementById('panel');
 
   const typeLabel = typeof props.type === 'string' ? props.type : 'unknown';
   const typeCapitalized = escapeHtml(typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1));
@@ -148,8 +158,7 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
     ? `<span class="badge badge-coordinates">${latFixed}, ${lngFixed}</span>`
     : '';
 
-  panel!.innerHTML = `
-    <button id="panel-close" aria-label="Close details">×</button>
+  renderPanel(`
     <h2>${escapeHtml(props.name)}</h2>
     <div class="panel-badges">
       <span class="badge badge-type">${typeCapitalized}</span>
@@ -185,9 +194,7 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
         </button>
       </div>
     </div>
-  `;
-
-  window.dispatchEvent(new Event('panel:updated'));
+  `);
 
   // Build the payload once — reused for both generate and regenerate
   const aiPayload = {
@@ -289,19 +296,14 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
   if (regenerateBtn) {
     regenerateBtn.addEventListener('click', () => runAiRequest(true));
   }
-
-  attachPanelClose();
-  openPanel();
 }
 
 export function updateCoordinatesPanel(lng: number, lat: number, elevation: number | null | undefined, isLoading = false): void {
-  const panel = document.getElementById('panel');
   const latFixed = Number(lat).toFixed(6);
   const lngFixed = Number(lng).toFixed(6);
   const altitudeText = renderAltitudeText(elevation, isLoading);
 
-  panel!.innerHTML = `
-    <button id="panel-close" aria-label="Close details">×</button>
+  renderPanel(`
     <h2>Clicked Coordinates</h2>
     <div class="panel-badges">
       <span class="badge badge-type">Map Click</span>
@@ -310,11 +312,7 @@ export function updateCoordinatesPanel(lng: number, lat: number, elevation: numb
     <p class="panel-info-line"><strong>Latitude:</strong> ${latFixed}</p>
     <p class="panel-info-line"><strong>Longitude:</strong> ${lngFixed}</p>
     <p class="panel-info-secondary">Decimal format: ${latFixed}, ${lngFixed}</p>
-  `;
-
-  attachPanelClose();
-  openPanel();
-  window.dispatchEvent(new Event('panel:updated'));
+  `);
 }
 
 // Targeted DOM patches — used to update a single field after the panel has
