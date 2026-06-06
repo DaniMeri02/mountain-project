@@ -8,6 +8,7 @@ import { reloadPrompt } from './agent/prompt-loader';
 import { buildSearchQuery } from './agent/search-query';
 import { translateQuery, validateFilter } from './agent/search-filter';
 import type { PoiResult, PoiType, SearchFilter, SmartSearchResult } from './agent/types';
+import { isMissingTableError } from './db';
 
 const fastify = Fastify({ logger: process.env.NODE_ENV !== 'production' });
 
@@ -28,23 +29,6 @@ type ParsedBBox = {
   maxLng: number;
   maxLat: number;
 };
-
-type ErrorWithCode = {
-  code?: string;
-};
-
-function getErrorCode(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null) {
-    return undefined;
-  }
-
-  const maybeError = error as ErrorWithCode;
-  if (typeof maybeError.code === 'string') {
-    return maybeError.code;
-  }
-
-  return undefined;
-}
 
 export function parseBBox(query: BBoxQuery): ParsedBBox | null {
   const minLng = Number(query.minLng);
@@ -205,7 +189,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/ferrata', async (request, reply) =
     const result = await pool.query(FERRATA_QUERY, [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat]);
     return result.rows[0]?.geojson ?? EMPTY_FC;
   } catch (error) {
-    if (getErrorCode(error) === '42P01') {
+    if (isMissingTableError(error)) {
       fastify.log.warn('Table "via_ferrata" not found yet. Returning empty dataset.');
       return EMPTY_FC;
     }
@@ -256,7 +240,7 @@ fastify.get<{ Querystring: BBoxQuery }>('/api/offline/bundle', async (request, r
       pool.query(TRAILS_QUERY, params),
       pool.query(POIS_QUERY, params),
       pool.query(FERRATA_QUERY, params).catch((err: unknown) => {
-        if (getErrorCode(err) === '42P01') {
+        if (isMissingTableError(err)) {
           return { rows: [{ geojson: EMPTY_FC }] };
         }
         throw err;
@@ -387,7 +371,7 @@ fastify.get<{ Querystring: SearchQuery }>('/api/search', async (request, reply) 
     const result = await pool.query(query, [searchPattern, searchTerm]);
     return result.rows;
   } catch (error) {
-    if (getErrorCode(error) === '42P01') {
+    if (isMissingTableError(error)) {
       // If ferrata tables are missing, gracefully keep POI search working.
       const fallbackQuery = `
         SELECT
@@ -498,7 +482,7 @@ fastify.post<{ Body: SmartSearchBody }>(
       };
       return response;
     } catch (error) {
-      if (getErrorCode(error) === '42P01') {
+      if (isMissingTableError(error)) {
         // admin_areas / via_ferrata not created yet — degrade gracefully to an empty set.
         fastify.log.warn('Smart search: a required table is missing. Returning empty result set.');
         return { filter, results: [], total: 0, offset: filter.offset, limit: filter.limit, modelUsed } satisfies SmartSearchResult;
