@@ -18,6 +18,17 @@ not implementation detail.
 - **Result set** — the POIs a SearchFilter matches; shown as a list in the panel and as map markers.
 - **DEM backfill** — POI elevations derived from a terrain model (Open-Elevation / OpenTopoData) for
   POIs whose OSM `ele` tag is missing. Such elevations are terrain-derived, not authoritative OSM.
+- **Route** — a path computed client-side over the trail graph between a start and end point, with
+  optional **via** points and a **round-trip** option. The compute runs in a web worker
+  (`src/routing/`); the result yields one or more **alternatives** the user can pick between, plus
+  distance and a GPX export. Snapping ties each clicked point to the nearest trail node.
+- **Basemap** — the map's tile style: Mapbox (outdoors / satellite 2D / satellite 3D), OpenStreetMap,
+  or OpenTopoMap. Switching basemap calls Mapbox `setStyle`, which wipes custom layers/markers, so
+  overlays and result markers are re-asserted on `style.load`.
+- **Offline area** — a user-saved bounding box whose trail/POI/ferrata overlays and map tiles are
+  downloaded for offline use. Overlays live in IndexedDB; tiles are cached by the service worker
+  under the basemap's workbox cache and ref-counted so deleting one area only evicts tiles no other
+  area still needs.
 
 ## Decisions
 
