@@ -145,4 +145,24 @@ describe('POST /api/ai/research', () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it('returns 400 for a POI type outside the allowed set', async () => {
+    const res = await fastify.inject({
+      method: 'POST', url: '/api/ai/research',
+      headers: { 'content-type': 'application/json' },
+      payload: { name: 'Castello', type: 'castle', lat: 45.9, lng: 9.8 },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('accepts each allowed POI type', async () => {
+    for (const type of ['peak', 'hut', 'bivouac', 'ferrata']) {
+      const res = await fastify.inject({
+        method: 'POST', url: '/api/ai/research',
+        headers: { 'content-type': 'application/json' },
+        payload: { name: 'X', type, lat: 45.9, lng: 9.8 },
+      });
+      expect(res.statusCode).toBe(200);
+    }
+  });
 });

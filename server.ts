@@ -498,7 +498,7 @@ fastify.post<{ Body: SmartSearchBody }>(
 
 type ResearchBody = {
   name: string;
-  type: string;
+  type: PoiType;
   elevation?: number | string | null;
   osm_id?: string | number | null;
   lat?: number | null;
@@ -512,7 +512,7 @@ const researchBodySchema = {
     required: ['name', 'type'],
     properties: {
       name: { type: 'string', minLength: 1 },
-      type: { type: 'string', minLength: 1 },
+      type: { type: 'string', enum: ['peak', 'hut', 'bivouac', 'ferrata'] },
       elevation: { type: ['number', 'null'] },
       osm_id: { type: ['string', 'integer', 'null'] },
       lat: { type: ['number', 'null'] },
@@ -544,7 +544,7 @@ fastify.post<{ Body: ResearchBody }>(
     }
     try {
       return await getOrchestrator().generate(
-        { name, type: type as PoiType, elevation, osm_id, lat, lng },
+        { name, type, elevation, osm_id, lat, lng },
         false,
         resolved.slug,
       );
@@ -566,7 +566,7 @@ fastify.post<{ Body: ResearchBody }>(
     }
     try {
       return await getOrchestrator().generate(
-        { name, type: type as PoiType, elevation, osm_id, lat, lng },
+        { name, type, elevation, osm_id, lat, lng },
         true,
         resolved.slug,
       );
