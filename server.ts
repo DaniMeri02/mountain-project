@@ -583,6 +583,75 @@ fastify.get('/api/config', async () => {
   return { mapboxToken: process.env.MAPBOX_TOKEN ?? '' };
 });
 
+// Point-elevation fallback for the map: Mapbox terrain only answers for DEM tiles
+// already loaded, so a click on a not-yet-streamed area returns no altitude. This
+// proxies the keyless OpenTopoData API (same source as scripts/backfill-elevation.ts)
+// so the client can resolve any coordinate. Override the dataset/host with DEM_API_URL.
+const DEM_API_URL = process.env.DEM_API_URL ?? 'https://api.opentopodata.org/v1/srtm30m';
+const ELEVATION_CACHE_MAX = 1000; // public endpoint is rate-limited to ~1 req/s
+const elevationCache = new Map<string, number | null>();
+
+type ElevationQuery = { lat?: string; lng?: string };
+type ElevationLookup = { lat: number; lng: number; key: string };
+
+// Validate the raw query and normalize it into a lookup. Reject non-finite or
+// out-of-range coordinates; round the cache key to ~11 m (4 dp) so nearby clicks
+// reuse one upstream call — finer than SRTM30m's ~30 m native resolution.
+export function parseElevationQuery(query: ElevationQuery): ElevationLookup | null {
+  const lat = Number(query.lat);
+  const lng = Number(query.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return null;
+  }
+
+  return { lat, lng, key: `${lat.toFixed(4)},${lng.toFixed(4)}` };
+}
+
+// Returns null on any upstream failure/timeout so the client degrades gracefully
+// to "Not available" rather than surfacing an error.
+async function fetchPointElevation(lat: number, lng: number): Promise<number | null> {
+  try {
+    const res = await fetch(DEM_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ locations: `${lat},${lng}` }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { results?: { elevation: number | null }[] };
+    const elevation = data.results?.[0]?.elevation;
+    return typeof elevation === 'number' && Number.isFinite(elevation) ? Math.round(elevation) : null;
+  } catch {
+    return null;
+  }
+}
+
+fastify.get<{ Querystring: ElevationQuery }>('/api/elevation', async (request, reply) => {
+  const parsed = parseElevationQuery(request.query);
+  if (!parsed) {
+    return reply.status(400).send({ error: 'Invalid coordinates' });
+  }
+
+  if (elevationCache.has(parsed.key)) {
+    return { elevation: elevationCache.get(parsed.key) ?? null };
+  }
+
+  const elevation = await fetchPointElevation(parsed.lat, parsed.lng);
+
+  // Bounded FIFO eviction so the cache can't grow unbounded.
+  if (elevationCache.size >= ELEVATION_CACHE_MAX) {
+    const oldest = elevationCache.keys().next().value;
+    if (oldest !== undefined) elevationCache.delete(oldest);
+  }
+  elevationCache.set(parsed.key, elevation);
+
+  return { elevation };
+});
+
 // Register the plugin to serve static files
 // In production, __dirname is dist/ so path.join(__dirname, 'public') → dist/public/ (Vite output)
 // In dev, Vite dev server handles the frontend on :5173; serve project-root/public as fallback

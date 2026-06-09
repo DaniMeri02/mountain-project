@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { AgentOrchestrator } from '../agent/orchestrator';
 
@@ -27,7 +27,7 @@ vi.mock('../agent/orchestrator', () => ({
 }));
 
 // Import server AFTER mocks are registered
-import { fastify, parseBBox } from '../server';
+import { fastify, parseBBox, parseElevationQuery } from '../server';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -178,5 +178,74 @@ describe('POST /api/ai/research', () => {
       });
       expect(res.statusCode).toBe(200);
     }
+  });
+});
+
+// ── parseElevationQuery ─────────────────────────────────────────────────────────
+
+describe('parseElevationQuery', () => {
+  it('parses valid coordinates and rounds the cache key to 4 dp', () => {
+    expect(parseElevationQuery({ lat: '46.077323', lng: '9.989028' }))
+      .toEqual({ lat: 46.077323, lng: 9.989028, key: '46.0773,9.9890' });
+  });
+
+  it('returns null for non-finite input', () => {
+    expect(parseElevationQuery({ lat: 'abc', lng: '9.6' })).toBeNull();
+    expect(parseElevationQuery({})).toBeNull();
+  });
+
+  it('returns null for out-of-range coordinates', () => {
+    expect(parseElevationQuery({ lat: '91', lng: '9.6' })).toBeNull();
+    expect(parseElevationQuery({ lat: '46', lng: '181' })).toBeNull();
+  });
+});
+
+// ── GET /api/elevation ──────────────────────────────────────────────────────────
+
+describe('GET /api/elevation', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns 400 for invalid coordinates', async () => {
+    const res = await fastify.inject({ method: 'GET', url: '/api/elevation', query: { lat: 'abc', lng: '9.6' } });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('proxies the DEM API and returns a rounded elevation', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [{ elevation: 1933.8 }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await fastify.inject({ method: 'GET', url: '/api/elevation', query: { lat: '46.10', lng: '9.61' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ elevation: 1934 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches by rounded coordinates — no second upstream call', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results: [{ elevation: 2500 }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const query = { lat: '46.20', lng: '9.70' };
+    const first = await fastify.inject({ method: 'GET', url: '/api/elevation', query });
+    const second = await fastify.inject({ method: 'GET', url: '/api/elevation', query });
+    expect(first.json()).toEqual({ elevation: 2500 });
+    expect(second.json()).toEqual({ elevation: 2500 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns { elevation: null } when the DEM API responds non-OK', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const res = await fastify.inject({ method: 'GET', url: '/api/elevation', query: { lat: '45.55', lng: '9.81' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ elevation: null });
+  });
+
+  it('returns { elevation: null } when the DEM API request throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')));
+    const res = await fastify.inject({ method: 'GET', url: '/api/elevation', query: { lat: '45.66', lng: '9.82' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ elevation: null });
   });
 });
