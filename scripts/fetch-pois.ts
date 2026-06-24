@@ -19,6 +19,25 @@ out center; // Overpass calculates the centroid (coordinates) even for ways/buil
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
+type PoiFeature = {
+  type: 'Feature';
+  properties: {
+    id: number;
+    name: string;
+    type: string;
+    elevation: number | string;
+    sort_elevation: number;
+    website: string;
+    description: string;
+    osm_id: number;
+  };
+  geometry: { type: 'Point'; coordinates: number[] };
+};
+
+// Stable identity for dedup: prefer osm_id, fall back to id.
+const poiKey = (f: { properties: { osm_id?: number | string; id?: number | string } }): string =>
+  String(f.properties.osm_id ?? f.properties.id);
+
 async function fetchPOIs() {
   console.log('🏔️ Downloading data from OpenStreetMap (Overpass API)...');
 
@@ -41,7 +60,7 @@ async function fetchPOIs() {
     console.log(`✅ Found ${data.elements.length} raw elements.`);
 
     // Transform OSM elements to GeoJSON
-    const features = [];
+    const features: PoiFeature[] = [];
 
     for (const element of data.elements) {
       const tags = element.tags || {};
@@ -92,17 +111,38 @@ async function fetchPOIs() {
       });
     }
 
+    // Merge into any existing pois.geojson instead of overwriting it, so fetching
+    // one region (this script's BBOX) never wipes POIs from other regions. Dedup by
+    // osm_id — freshly-fetched features replace stale ones with the same id.
+    const outputPath = path.join(process.cwd(), 'public/data/pois.geojson');
+    const byId = new Map<string, PoiFeature>();
+
+    try {
+      const existingRaw = await fs.readFile(outputPath, 'utf8');
+      const existing = JSON.parse(existingRaw) as { features?: PoiFeature[] };
+      for (const f of existing.features ?? []) byId.set(poiKey(f), f);
+      console.log(`📂 Merging into ${byId.size} existing POIs...`);
+    } catch {
+      console.log('📂 No existing pois.geojson — writing a fresh file.');
+    }
+
+    let added = 0;
+    let refreshed = 0;
+    for (const f of features) {
+      if (byId.has(poiKey(f))) refreshed++;
+      else added++;
+      byId.set(poiKey(f), f);
+    }
+
     const geojson = {
       type: 'FeatureCollection',
-      features: features
+      features: [...byId.values()]
     };
 
-    // Save to the public/data folder so Fastify can serve it to the frontend map
-    const outputPath = path.join(process.cwd(), 'public/data/pois.geojson');
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(geojson, null, 2));
 
-    console.log(`🗺️ Saved ${features.length} Points of Interest to ${outputPath}`);
+    console.log(`🗺️ Saved ${geojson.features.length} POIs to ${outputPath} (${added} new, ${refreshed} refreshed, deduped by osm_id).`);
 
   } catch (error) {
     console.error('❌ Error during fetch:', error);
