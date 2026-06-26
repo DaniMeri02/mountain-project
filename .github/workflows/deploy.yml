@@ -1,0 +1,39 @@
+name: build-and-deploy
+
+# Build off-box on GitHub's runners (the 2 GB mini-pc can't run Vite/esbuild
+# safely), then publish the built dist/ to an orphan `deploy` branch. The box
+# polls that branch and runs the prebuilt artifact — it never builds.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build # esbuild -> dist/server.js, vite -> dist/public
+
+      - name: Publish dist/ to orphan deploy branch
+        run: |
+          cd dist
+          git init -q
+          git config user.name ci
+          git config user.email ci@local
+          git add -A
+          git commit -qm "build ${GITHUB_SHA::7}"
+          git branch -M deploy
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" deploy

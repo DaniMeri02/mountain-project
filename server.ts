@@ -671,8 +671,9 @@ fastify.addHook('onClose', async () => {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000 });
-    console.log('🏔️ Portal is live! Visit http://localhost:3000 in your browser');
+    const host = process.env.HOST ?? '127.0.0.1';
+    await fastify.listen({ port: 3000, host });
+    console.log(`🏔️ Portal is live! Listening on ${host}:3000`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
