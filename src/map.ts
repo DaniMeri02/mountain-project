@@ -339,7 +339,7 @@ export function addMapLayers(map: mapboxgl.Map): void {
       id: 'ferrata-lines',
       type: 'line',
       source: 'mountain-ferrata',
-      minzoom: 11,
+      minzoom: 12,
       layout: {
         'line-join': 'round',
         'line-cap': 'round',
