@@ -175,9 +175,13 @@ export function buildGraph(features: RawFeature[]): Graph {
     node.componentSize = compSizes.get(ufFind(key)) ?? 1;
   }
 
-  // Gap-bridging: connect large disconnected components that are nearly adjacent.
+  // Gap-bridging: connect disconnected components that are nearly adjacent.
+  // The 50m cap is the real safety net (won't leap wide gaps); the min-size floor
+  // just filters GPS-noise fragments. Keep it low (3) so legitimate short stubs —
+  // like OSM ways whose endpoints sit ~13m apart without sharing a node — still
+  // get bridged instead of stranding the router on an island.
   const BRIDGE_MAX_METERS = 50;
-  const BRIDGE_MIN_COMP_SIZE = 20;
+  const BRIDGE_MIN_COMP_SIZE = 3;
   const BRIDGE_BUCKET_DEG = 0.0005; // ~55m per bucket at alpine latitudes
 
   const compNodeLists: Map<string, [string, GraphNode][]> = new Map();
