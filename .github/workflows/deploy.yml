@@ -25,7 +25,16 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build # esbuild -> dist/server.js, vite -> dist/public
+      - run: npm run build # esbuild -> dist/server.js, vite -> dist/public, cp ai-agent-conf
+
+      # The box runs dist/ as its working directory, so every file the server
+      # reads at runtime must be inside the artifact. The prompts are read from
+      # process.cwd()/ai-agent-conf — shipping without them breaks smart search
+      # and AI guides on the box only.
+      - name: Verify runtime assets are in the artifact
+        run: |
+          test -f dist/ai-agent-conf/agent-prompt.md
+          test -f dist/ai-agent-conf/search-filter-prompt.md
 
       - name: Publish dist/ to orphan deploy branch
         run: |
