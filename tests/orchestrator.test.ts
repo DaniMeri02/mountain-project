@@ -197,6 +197,13 @@ describe('AgentOrchestrator.generate', () => {
 
     expect(result.description).toBe('Recovered description');
   });
+
+  it('names every failed model when the whole cascade fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeAiError(404, 'gone')));
+
+    const orch = new AgentOrchestrator(mockPool);
+    await expect(orch.generate(baseInput)).rejects.toThrow(/All \d+ AI models failed/);
+  });
 });
 
 // ── shouldCascade ─────────────────────────────────────────────────────────────

@@ -280,7 +280,9 @@ export class AgentOrchestrator {
 
     let description: string | undefined;
     let modelUsed: string | undefined;
-    let lastError: unknown;
+    // Every attempt is recorded. Previously only the last error survived, so an early model's real
+    // problem (an exhausted key, say) stayed invisible behind a later model's unrelated noise.
+    const failures: string[] = [];
 
     for (const model of orderedModels) {
       try {
@@ -289,12 +291,17 @@ export class AgentOrchestrator {
         modelUsed = model.label;
         break;
       } catch (err: unknown) {
-        lastError = err;
+        const status = (err as { status?: number }).status ?? 'no status';
+        const message = err instanceof Error ? err.message : String(err);
+        failures.push(`${model.slug} (${status}): ${message}`);
+        console.error(`[ai] ${model.slug} failed — ${status}: ${message}`);
         if (!shouldCascade(err)) throw err;
       }
     }
 
-    if (!description || !modelUsed) throw lastError;
+    if (!description || !modelUsed) {
+      throw new Error(`All ${orderedModels.length} AI models failed:\n${failures.join('\n')}`);
+    }
 
     const expiresAt = await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
 
