@@ -86,15 +86,16 @@ agent/
     tripadvisor.ts        ← DISABLED — Apify per-run charges too high
 ```
 
-**AI model cascade** (ranked fallback order, tries next on 429/5xx):
+**AI model cascade** (ranked fallback order; tries the next model on any failure except a
+malformed request body — see `shouldCascade`):
 1. `gemini-2.5-flash` (Google) — key: GEMINI_API_KEY
-2. `qwen/qwen3-32b` (Groq) — key: GROQ_API_KEY
-3. `llama-3.3-70b-versatile` (Groq)
-4. `meta-llama/llama-4-scout-17b-16e-instruct` (Groq)
-5. `openai/gpt-oss-120b` (Groq)
-6. `gemini-2.5-flash-lite` (Google)
-7. `google/gemma-4-31b-it:free` (OpenRouter) — key: OPENROUTER_API_KEY
-8. `meta-llama/llama-3.3-70b-instruct:free` (OpenRouter)
+2. `gemini-2.5-flash-lite` (Google)
+3. `openai/gpt-oss-120b` (Groq) — key: GROQ_API_KEY
+4. `openai/gpt-oss-20b` (Groq)
+5. `google/gemma-4-31b-it:free` (OpenRouter) — key: OPENROUTER_API_KEY
+
+Providers retire slugs on a rolling basis. A model returning 404 means the catalogue moved — re-check
+the list against each provider's `GET /models` rather than treating it as a code bug.
 
 **Flow**: `POST /api/ai/research` → check cache → if miss: run 7 active sources in parallel via `Promise.allSettled` → build context → call AI model (cascade) with system prompt from `agent-prompt.md` → store in DB cache → return `AgentResponse`.
 

@@ -34,7 +34,19 @@ export interface AiModel {
   key: string;
 }
 
-/** Ranked model list — first entry is used by default, others are tried in order on failure. */
+/**
+ * Ranked model list — first entry is used by default, others are tried in order on failure.
+ *
+ * Every entry was verified against the real agent prompt on 2026-08-26. Providers retire slugs on
+ * a rolling basis, so a model that starts returning 404 is not a bug in this file — it means the
+ * catalogue moved and the list needs re-checking against each provider's GET /models.
+ *
+ * Deliberately excluded after testing:
+ *   - qwen/qwen3.6-27b (Groq) — emits an untagged planning monologue before the answer, which
+ *                               sanitizeAiResponse cannot strip; renders as garbage in the panel.
+ *   - groq/compound           — 413 request_too_large: rejects any request carrying our prompt.
+ *   - groq/compound-mini      — returns 200 with empty content.
+ */
 export const AI_MODELS: AiModel[] = [
   {
     slug: 'gemini-2.5-flash',
@@ -43,22 +55,10 @@ export const AI_MODELS: AiModel[] = [
     key: 'GEMINI_API_KEY',
   },
   {
-    slug: 'qwen/qwen3-32b',
-    label: 'Qwen3 32B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
-  },
-  {
-    slug: 'llama-3.3-70b-versatile',
-    label: 'Llama 3.3 70B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
-  },
-  {
-    slug: 'meta-llama/llama-4-scout-17b-16e-instruct',
-    label: 'Llama 4 Scout 17B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
+    slug: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite (Google)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    key: 'GEMINI_API_KEY',
   },
   {
     slug: 'openai/gpt-oss-120b',
@@ -67,20 +67,14 @@ export const AI_MODELS: AiModel[] = [
     key: 'GROQ_API_KEY',
   },
   {
-    slug: 'gemini-2.5-flash-lite',
-    label: 'Gemini 2.5 Flash-Lite (Google)',
-    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    key: 'GEMINI_API_KEY',
+    slug: 'openai/gpt-oss-20b',
+    label: 'GPT-OSS 20B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
   },
   {
     slug: 'google/gemma-4-31b-it:free',
     label: 'Gemma 4 31B (OpenRouter)',
-    base: 'https://openrouter.ai/api/v1',
-    key: 'OPENROUTER_API_KEY',
-  },
-  {
-    slug: 'meta-llama/llama-3.3-70b-instruct:free',
-    label: 'Llama 3.3 70B (OpenRouter)',
     base: 'https://openrouter.ai/api/v1',
     key: 'OPENROUTER_API_KEY',
   },
