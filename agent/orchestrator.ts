@@ -150,14 +150,18 @@ export async function callAiModel(
 
 /**
  * Returns true if the error warrants trying the next model in the fallback chain.
- * Returns false for errors that indicate a client-side mistake (bad key, malformed request, etc.)
+ *
+ * Nearly every failure is specific to one model or one provider: a retired slug (404), a prompt
+ * too large for that model (413), an exhausted key or quota (401/403/429), a provider outage
+ * (5xx). None of those say anything about whether the *next* model would succeed.
+ *
+ * Only a malformed request body is universal — we build an identical body for every model, so a
+ * 400/422 would fail the same way for all of them and cascading just wastes time hiding our bug.
  */
 export function shouldCascade(err: unknown): boolean {
   const status = (err as { status?: number }).status;
-  if (status == null) return true;  // network error / timeout — transient
-  if (status === 429) return true;  // rate-limited — next model may have quota
-  if (status >= 500) return true;   // server overloaded — transient
-  return false;                     // 4xx client errors — bad key or request bug, fail fast
+  if (status == null) return true;          // network error / timeout — transient
+  return status !== 400 && status !== 422;  // only a malformed body fails identically everywhere
 }
 
 const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
