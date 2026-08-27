@@ -193,6 +193,40 @@ export interface KomootTip {
   rating?: { up?: number; down?: number }; // API uses "rating", not "votes"
 }
 
+// ─── Google Places API (New) ──────────────────────────────────────────────────
+// Text Search, Pro field mask. Used only to verify that a hut or bivouac really is
+// pinned on Google Maps — never as narrative material for the model.
+
+/** One candidate from POST places:searchText, shaped by our X-Goog-FieldMask. */
+export interface PlaceCandidate {
+  id: string;
+  displayName?: { text?: string; languageCode?: string };
+  location?: { latitude: number; longitude: number };
+  googleMapsUri?: string;   // corroboration only — the link we render is built from `id`
+  primaryType?: string;
+}
+
+export interface PlacesSearchResponse {
+  places?: PlaceCandidate[];
+  error?: { code?: number; message?: string; status?: string };
+}
+
+/**
+ * Outcome of a place lookup.
+ *  - `found`       — a candidate cleared every gate; `url` and `placeId` are set.
+ *  - `not_found`   — the API answered and nothing qualified. A verified absence.
+ *  - `unavailable` — we never got a trustworthy answer (no key, wrong POI type, throttled,
+ *                    network failure). Must never be rendered as "no link": that would assert
+ *                    something we did not check.
+ */
+export interface GooglePlaceLink {
+  status: 'found' | 'not_found' | 'unavailable';
+  url?: string;
+  placeId?: string;
+  /** Per-candidate verdicts, written to agent-sources-dump.txt so bad matches are diagnosable. */
+  debug?: string[];
+}
+
 // ─── Reddit API ───────────────────────────────────────────────────────────────
 
 export interface RedditTokenResponse {
