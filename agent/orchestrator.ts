@@ -230,7 +230,16 @@ async function writeSourcesDump(
 export function renderGoogleMapsBlock(link: GooglePlaceLink): string {
   if (link.status === 'found' && link.url) {
     const href = escapeHtmlAttribute(link.url);
-    return `\n<h3>Google Maps</h3>\n<p><a href="${href}" target="_blank" rel="noopener noreferrer">Apri la scheda su Google Maps</a></p>`;
+    // The copy button carries no URL of its own — the frontend reads it from the sibling anchor,
+    // so there is only ever one copy of the link in the markup and nothing to keep in sync.
+    return (
+      '\n<h3>Google Maps</h3>' +
+      '\n<p class="gmaps-row">' +
+      `<a href="${href}" target="_blank" rel="noopener noreferrer">Apri link Google Maps</a>` +
+      // Icon-only: the glyph is drawn in CSS, because DOMPurify's html profile strips <svg>.
+      '<button type="button" class="gmaps-copy" title="Copia link" aria-label="Copia link"></button>' +
+      '</p>'
+    );
   }
   if (link.status === 'not_found') {
     return '\n<h3>Google Maps</h3>\n<p>Nessun link Google Maps disponibile.</p>';

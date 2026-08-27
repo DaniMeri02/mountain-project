@@ -226,9 +226,34 @@ describe('renderGoogleMapsBlock', () => {
   it('renders a link that opens in a new tab, in Italian like the description', () => {
     const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
     expect(html).toContain('<h3>Google Maps</h3>');
-    expect(html).toContain('Apri la scheda su Google Maps');
+    expect(html).toContain('Apri link Google Maps');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it('renders an icon-only copy button that holds no URL of its own', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('<button type="button" class="gmaps-copy"');
+    expect(html).toContain('aria-label="Copia link"');
+    // Empty element: the glyph is drawn in CSS, since DOMPurify's html profile strips <svg>.
+    expect(html).toContain('></button>');
+    // The URL appears exactly once — the button reads it from the sibling anchor at click time,
+    // so there is no second copy to fall out of sync.
+    expect(html.match(/query_place_id=ChIJx/g)).toHaveLength(1);
+  });
+
+  it('labels the button for both pointer and assistive use', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('title="Copia link"');
+    expect(html).toContain('aria-label="Copia link"');
+  });
+
+  it('gives the button and link a shared row to sit in', () => {
+    expect(renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' })).toContain('class="gmaps-row"');
+  });
+
+  it('renders no button when there is no link to copy', () => {
+    expect(renderGoogleMapsBlock({ status: 'not_found' })).not.toContain('gmaps-copy');
   });
 
   it('escapes the href so the query separator cannot break the attribute', () => {

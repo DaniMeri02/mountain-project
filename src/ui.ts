@@ -129,6 +129,70 @@ async function fetchAiModels(): Promise<AiModel[]> {
 
 fetchAiModels().catch(() => {}); // pre-warm on module load
 
+/**
+ * Copies text, falling back to execCommand when the Clipboard API is unavailable.
+ *
+ * navigator.clipboard exists only in a secure context. The portal is reached over plain HTTP on
+ * the LAN box, so on the device it matters most the modern API is simply absent — the deprecated
+ * path is the working one there, not a legacy nicety.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Permission denied or blocked — fall through to the textarea approach
+    }
+  }
+
+  const scratch = document.createElement('textarea');
+  scratch.value = text;
+  scratch.setAttribute('readonly', '');
+  scratch.style.position = 'fixed';
+  scratch.style.top = '-1000px';
+  scratch.style.opacity = '0';
+  document.body.appendChild(scratch);
+  scratch.select();
+
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+  document.body.removeChild(scratch);
+  return copied;
+}
+
+/**
+ * Wires the copy buttons the agent appends alongside a Google Maps link. Called after every render
+ * of the AI result, since innerHTML replaces the previous nodes and their listeners with them.
+ */
+function attachCopyButtons(container: HTMLElement): void {
+  const buttons = container.querySelectorAll<HTMLButtonElement>('.gmaps-copy');
+
+  buttons.forEach((button) => {
+    button.addEventListener('click', async () => {
+      const link = button.parentElement?.querySelector('a');
+      if (!link) return;
+
+      const copied = await copyToClipboard(link.href);
+
+      // The button is icon-only — feedback is the glyph swapping to a tick, drawn in CSS from the
+      // state class. Only the tooltip carries words.
+      button.classList.remove('is-copied', 'is-failed');
+      button.classList.add(copied ? 'is-copied' : 'is-failed');
+      button.title = copied ? 'Copiato' : 'Copia non riuscita';
+
+      window.setTimeout(() => {
+        button.classList.remove('is-copied', 'is-failed');
+        button.title = 'Copia link';
+      }, 1600);
+    });
+  });
+}
+
 export async function updatePanel(props: PanelProps, coordinates: Coordinates | null): Promise<void> {
   const aiModels = await fetchAiModels();
 
@@ -259,6 +323,7 @@ export async function updatePanel(props: PanelProps, coordinates: Coordinates | 
         }
         await yieldToMain();
         resultContent.innerHTML = html;
+        attachCopyButtons(resultContent);
       }
 
       if (metaDiv) {
