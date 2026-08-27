@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
-import { buildUserMessage, AgentOrchestrator } from '../agent/orchestrator';
+import { buildUserMessage, AgentOrchestrator, shouldCascade } from '../agent/orchestrator';
 import type { Pool } from 'pg';
 import type { SourceResult, CachedDescription } from '../agent/types';
 import { fetchWikidata } from '../agent/sources/wikidata';
@@ -184,5 +184,49 @@ describe('AgentOrchestrator.generate', () => {
 
     const orch = new AgentOrchestrator(mockPool);
     await expect(orch.generate(baseInput)).rejects.toThrow();
+  });
+
+  it('cascades past a retired model slug (404) instead of aborting', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(makeAiError(404, 'The model `dead-slug` does not exist'))
+      .mockResolvedValueOnce(makeAiResponse('Recovered description')),
+    );
+
+    const orch = new AgentOrchestrator(mockPool);
+    const result = await orch.generate(baseInput);
+
+    expect(result.description).toBe('Recovered description');
+  });
+
+  it('names every failed model when the whole cascade fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeAiError(404, 'gone')));
+
+    const orch = new AgentOrchestrator(mockPool);
+    await expect(orch.generate(baseInput)).rejects.toThrow(/All \d+ AI models failed/);
+  });
+});
+
+// ── shouldCascade ─────────────────────────────────────────────────────────────
+
+describe('shouldCascade', () => {
+  const withStatus = (status?: number): Error => Object.assign(new Error('boom'), { status });
+
+  it.each([
+    ['network error / timeout', undefined],
+    ['retired model slug', 404],
+    ['prompt too large for this model', 413],
+    ['exhausted key or quota', 429],
+    ['bad key for this provider', 401],
+    ['forbidden for this provider', 403],
+    ['provider outage', 503],
+  ])('cascades on %s', (_label, status) => {
+    expect(shouldCascade(withStatus(status))).toBe(true);
+  });
+
+  it.each([
+    ['malformed request body', 400],
+    ['unprocessable request body', 422],
+  ])('fails fast on %s — identical for every model', (_label, status) => {
+    expect(shouldCascade(withStatus(status))).toBe(false);
   });
 });

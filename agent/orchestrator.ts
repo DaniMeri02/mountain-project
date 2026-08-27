@@ -34,7 +34,19 @@ export interface AiModel {
   key: string;
 }
 
-/** Ranked model list — first entry is used by default, others are tried in order on failure. */
+/**
+ * Ranked model list — first entry is used by default, others are tried in order on failure.
+ *
+ * Every entry was verified against the real agent prompt on 2026-08-26. Providers retire slugs on
+ * a rolling basis, so a model that starts returning 404 is not a bug in this file — it means the
+ * catalogue moved and the list needs re-checking against each provider's GET /models.
+ *
+ * Deliberately excluded after testing:
+ *   - qwen/qwen3.6-27b (Groq) — emits an untagged planning monologue before the answer, which
+ *                               sanitizeAiResponse cannot strip; renders as garbage in the panel.
+ *   - groq/compound           — 413 request_too_large: rejects any request carrying our prompt.
+ *   - groq/compound-mini      — returns 200 with empty content.
+ */
 export const AI_MODELS: AiModel[] = [
   {
     slug: 'gemini-2.5-flash',
@@ -43,22 +55,10 @@ export const AI_MODELS: AiModel[] = [
     key: 'GEMINI_API_KEY',
   },
   {
-    slug: 'qwen/qwen3-32b',
-    label: 'Qwen3 32B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
-  },
-  {
-    slug: 'llama-3.3-70b-versatile',
-    label: 'Llama 3.3 70B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
-  },
-  {
-    slug: 'meta-llama/llama-4-scout-17b-16e-instruct',
-    label: 'Llama 4 Scout 17B (Groq)',
-    base: 'https://api.groq.com/openai/v1',
-    key: 'GROQ_API_KEY',
+    slug: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite (Google)',
+    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    key: 'GEMINI_API_KEY',
   },
   {
     slug: 'openai/gpt-oss-120b',
@@ -67,20 +67,14 @@ export const AI_MODELS: AiModel[] = [
     key: 'GROQ_API_KEY',
   },
   {
-    slug: 'gemini-2.5-flash-lite',
-    label: 'Gemini 2.5 Flash-Lite (Google)',
-    base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    key: 'GEMINI_API_KEY',
+    slug: 'openai/gpt-oss-20b',
+    label: 'GPT-OSS 20B (Groq)',
+    base: 'https://api.groq.com/openai/v1',
+    key: 'GROQ_API_KEY',
   },
   {
     slug: 'google/gemma-4-31b-it:free',
     label: 'Gemma 4 31B (OpenRouter)',
-    base: 'https://openrouter.ai/api/v1',
-    key: 'OPENROUTER_API_KEY',
-  },
-  {
-    slug: 'meta-llama/llama-3.3-70b-instruct:free',
-    label: 'Llama 3.3 70B (OpenRouter)',
     base: 'https://openrouter.ai/api/v1',
     key: 'OPENROUTER_API_KEY',
   },
@@ -150,14 +144,18 @@ export async function callAiModel(
 
 /**
  * Returns true if the error warrants trying the next model in the fallback chain.
- * Returns false for errors that indicate a client-side mistake (bad key, malformed request, etc.)
+ *
+ * Nearly every failure is specific to one model or one provider: a retired slug (404), a prompt
+ * too large for that model (413), an exhausted key or quota (401/403/429), a provider outage
+ * (5xx). None of those say anything about whether the *next* model would succeed.
+ *
+ * Only a malformed request body is universal — we build an identical body for every model, so a
+ * 400/422 would fail the same way for all of them and cascading just wastes time hiding our bug.
  */
 export function shouldCascade(err: unknown): boolean {
   const status = (err as { status?: number }).status;
-  if (status == null) return true;  // network error / timeout — transient
-  if (status === 429) return true;  // rate-limited — next model may have quota
-  if (status >= 500) return true;   // server overloaded — transient
-  return false;                     // 4xx client errors — bad key or request bug, fail fast
+  if (status == null) return true;          // network error / timeout — transient
+  return status !== 400 && status !== 422;  // only a malformed body fails identically everywhere
 }
 
 const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
@@ -276,7 +274,9 @@ export class AgentOrchestrator {
 
     let description: string | undefined;
     let modelUsed: string | undefined;
-    let lastError: unknown;
+    // Every attempt is recorded. Previously only the last error survived, so an early model's real
+    // problem (an exhausted key, say) stayed invisible behind a later model's unrelated noise.
+    const failures: string[] = [];
 
     for (const model of orderedModels) {
       try {
@@ -285,12 +285,17 @@ export class AgentOrchestrator {
         modelUsed = model.label;
         break;
       } catch (err: unknown) {
-        lastError = err;
+        const status = (err as { status?: number }).status ?? 'no status';
+        const message = err instanceof Error ? err.message : String(err);
+        failures.push(`${model.slug} (${status}): ${message}`);
+        console.error(`[ai] ${model.slug} failed — ${status}: ${message}`);
         if (!shouldCascade(err)) throw err;
       }
     }
 
-    if (!description || !modelUsed) throw lastError;
+    if (!description || !modelUsed) {
+      throw new Error(`All ${orderedModels.length} AI models failed:\n${failures.join('\n')}`);
+    }
 
     const expiresAt = await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
 
