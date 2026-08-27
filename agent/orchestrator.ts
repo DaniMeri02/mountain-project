@@ -11,9 +11,11 @@ import { fetchYouTubeVideos } from './sources/youtube';
 import { fetchRedditPosts } from './sources/reddit';
 import { fetchKomootData } from './sources/komoot';
 import { gatherSources, type NamedSource } from './sources/gather';
+import { resolveGooglePlace } from './sources/google-places';
+import { GooglePlaceCache } from './google-place-cache';
 // TripAdvisor (maxcopell~tripadvisor) charges per-run on top of compute units — disabled
 // Facebook (apify~facebook-posts/groups-scraper) — disabled: Apify credits exhausted
-import type { AgentInput, AgentResponse, SourceResult } from './types';
+import type { AgentInput, AgentResponse, GooglePlaceLink, SourceResult } from './types';
 
 // The sources consulted for every AI guide. The name attributes the result even when the
 // fetch throws, so a failed source is reported (not silently dropped) with its identity intact.
@@ -161,7 +163,11 @@ export function shouldCascade(err: unknown): boolean {
 const DUMP_FILE = join(__dirname, '..', 'agent-sources-dump.txt');
 const DUMP_MAX_BYTES = 1_000_000; // 1 MB cap — truncate before writing to prevent unbounded growth
 
-async function writeSourcesDump(userMessage: string, results: SourceResult[]): Promise<void> {
+async function writeSourcesDump(
+  userMessage: string,
+  results: SourceResult[],
+  placeLink?: GooglePlaceLink,
+): Promise<void> {
   if (process.env.NODE_ENV === 'production') return;
 
   const separator = '═'.repeat(60);
@@ -186,6 +192,16 @@ async function writeSourcesDump(userMessage: string, results: SourceResult[]): P
     lines.push('');
   }
 
+  // The place lookup is not a source — it never reaches the prompt — but its decision trail is
+  // the only way to tell a wrong match from a genuine absence after the fact.
+  if (placeLink) {
+    lines.push(separator);
+    lines.push(`>>> GOOGLE PLACES — status: ${placeLink.status}`);
+    if (placeLink.url) lines.push(`URL: ${placeLink.url}`);
+    lines.push(...(placeLink.debug ?? ['(no diagnostics)']));
+    lines.push('');
+  }
+
   lines.push(separator);
   const content = lines.join('\n');
 
@@ -199,6 +215,32 @@ async function writeSourcesDump(userMessage: string, results: SourceResult[]): P
   } catch {
     // Non-critical — dump failure must not affect the response
   }
+}
+
+/**
+ * The Google Maps section, appended to the finished description.
+ *
+ * Written here rather than by the model on purpose: models mangle long URLs, and each of the five
+ * would do it differently. The text is Italian because it joins the generated description, which
+ * stays Italian by design — only the interface is English.
+ *
+ * `unavailable` renders nothing at all. A missing key, a throttled lookup or a network failure
+ * must never appear as "nessun link", which would assert an absence we never verified.
+ */
+export function renderGoogleMapsBlock(link: GooglePlaceLink): string {
+  if (link.status === 'found' && link.url) {
+    const href = escapeHtmlAttribute(link.url);
+    return `\n<h3>Google Maps</h3>\n<p><a href="${href}" target="_blank" rel="noopener noreferrer">Apri la scheda su Google Maps</a></p>`;
+  }
+  if (link.status === 'not_found') {
+    return '\n<h3>Google Maps</h3>\n<p>Nessun link Google Maps disponibile.</p>';
+  }
+  return '';
+}
+
+/** The URL is ours, not user input, but it lands in an HTML attribute — escape it regardless. */
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export function buildUserMessage(input: AgentInput, results: SourceResult[]): string {
@@ -227,9 +269,11 @@ export function buildUserMessage(input: AgentInput, results: SourceResult[]): st
 
 export class AgentOrchestrator {
   private readonly cache: AiDescriptionCache;
+  private readonly placeCache: GooglePlaceCache;
 
   constructor(pool: Pool) {
     this.cache = new AiDescriptionCache(pool);
+    this.placeCache = new GooglePlaceCache(pool);
   }
 
   async generate(
@@ -252,6 +296,10 @@ export class AgentOrchestrator {
       }
     }
 
+    // Runs alongside the sources so it adds no latency, but is awaited separately and kept out of
+    // buildUserMessage: the model must never see the URL, or it will try to reproduce it.
+    const placeLinkPromise = resolveGooglePlace(input, this.placeCache, cacheKey);
+
     const results: SourceResult[] = await gatherSources(SOURCES, input, (name, err) =>
       console.error(`[${name}] source failed`, err),
     );
@@ -260,7 +308,8 @@ export class AgentOrchestrator {
 
     const systemPrompt = loadAgentPrompt();
     const userMessage = buildUserMessage(input, results);
-    void writeSourcesDump(userMessage, results);
+    const placeLink = await placeLinkPromise;
+    void writeSourcesDump(userMessage, results, placeLink);
 
     // Move preferred model to front while preserving ranked fallback order
     const orderedModels = [...AI_MODELS];
@@ -296,6 +345,8 @@ export class AgentOrchestrator {
     if (!description || !modelUsed) {
       throw new Error(`All ${orderedModels.length} AI models failed:\n${failures.join('\n')}`);
     }
+
+    description += renderGoogleMapsBlock(placeLink);
 
     const expiresAt = await this.cache.set(cacheKey, input.name, input.type, description, successfulSources);
 
