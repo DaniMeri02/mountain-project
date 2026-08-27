@@ -25,6 +25,15 @@ not implementation detail.
 - **Basemap** — the map's tile style: Mapbox (outdoors / satellite 2D / satellite 3D), OpenStreetMap,
   or OpenTopoMap. Switching basemap calls Mapbox `setStyle`, which wipes custom layers/markers, so
   overlays and result markers are re-asserted on `style.load`.
+- **Interface language / content language** — two different things, deliberately. Everything the
+  portal itself says is **English**: buttons, labels, badges, errors. Everything the AI *generates*
+  about a place is **Italian**, including its section headings, so it reads in the same language as
+  the sources it draws on and stays usable by Italian visitors.
+- **Verified Maps link** — a Google Maps link shown for a hut or bivouac only when the place was
+  confirmed to be that POI: near enough, named compatibly, and not contradicted by the kind of
+  building Google names. Distinct from a **verified absence** (Google was asked and had no matching
+  listing, which the description states outright) and from an **unresolved lookup** (no answer was
+  obtained — nothing is shown, because silence is not evidence of absence).
 - **Offline area** — a user-saved bounding box whose trail/POI/ferrata overlays and map tiles are
   downloaded for offline use. Overlays live in IndexedDB; tiles are cached by the service worker
   under the basemap's workbox cache and ref-counted so deleting one area only evicts tiles no other

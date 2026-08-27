@@ -20,6 +20,7 @@ npm run build         # esbuild → dist/server.js
 npm run start         # node dist/server.js (production)
 npm run migrate:ai    # create ai_description_cache table (run once per DB instance)
 npm run migrate:search # create admin_areas table + make pois.elevation nullable (run once)
+npm run migrate:places # create google_place_cache + google_places_usage tables (run once)
 npm run import:areas  # import ISTAT/openpolis province+region boundaries into admin_areas
 npm run backfill:elevation # fill missing POI elevations from a free DEM API (one-time)
 npm run fetch:data    # fetch POIs from Overpass API
@@ -41,6 +42,8 @@ npm run typecheck     # tsc --noEmit
 | `via_ferrata` | Via ferrata routes — id, osm_id, name, via_ferrata_scale, sac_scale, source_type, geom |
 | `ai_description_cache` | AI-generated descriptions — cache_key (SHA256), poi_name, poi_type, description, sources (JSONB), generated_at, expires_at (48h TTL) |
 | `admin_areas` | Province + region polygons (ISTAT/openpolis) — id, kind ('province'\|'region'), name, geom; powers smart-search area filters via ST_Intersects (GIST-indexed) |
+| `google_place_cache` | Verified Google Maps place IDs for huts/bivouacs — cache_key (shares `buildCacheKey`), place_id (NULL = verified absent), poi_name, checked_at. Hits kept forever, absences re-checked after 7 days |
+| `google_places_usage` | Places API spend guard — period ('YYYY-MM-DD' or 'YYYY-MM'), calls. Hard ceilings of 150/day and 4,500/month |
 
 ## API endpoints
 
@@ -72,7 +75,9 @@ agent/
   orchestrator.ts         ← main flow: parallel sources → AI cascade → cache → response
   search-filter.ts        ← NL query → validated SearchFilter (AI cascade + 6h in-process cache); reads ai-agent-conf/search-filter-prompt.md
   search-query.ts         ← pure SearchFilter → parameterized PostGIS query (pois ∪ ferrata)
+  google-place-cache.ts   ← GooglePlaceCache: place-id storage + Places API spend counters
   sources/
+    google-places.ts      ← verified Google Maps link for huts/bivouacs (NOT in SOURCES — see below)
     http.ts               ← shared fetchHtml() + SCRAPER_HEADERS utility
     wikidata.ts           ← Wikidata SPARQL (elevation, Wikipedia, description)
     overpass.ts           ← OSM extra tags via Overpass API (phone, hours, operator…)
@@ -101,6 +106,23 @@ the list against each provider's `GET /models` rather than treating it as a code
 
 Each source fails gracefully (`success: false`) without blocking the others. Debug dump written to `agent-sources-dump.txt` on each request.
 
+**Google Maps link (huts and bivouacs only)**: `agent/sources/google-places.ts` is deliberately
+**not** in the `SOURCES` array. No model in the cascade can browse, so a Maps URL written by an LLM
+is invented — the link is resolved server-side and appended to the finished description by
+`renderGoogleMapsBlock`, and the URL never enters the prompt. The lookup runs in parallel with the
+sources, so it adds no latency.
+
+Places API (New) Text Search, Pro field mask. A candidate is linked only if it clears four gates:
+`primaryType` deny-list → within 300 m → no contradicting kind-of-building word → name-token tier
+(identical / nested / distinctive-token-only, the last trusted only when it is the sole survivor).
+The link is built from the place ID, never from the returned `googleMapsUri` — place IDs are the
+one field exempt from Google's caching restrictions, and the returned URI carries a `g_mp`
+telemetry parameter.
+
+Three outcomes, and the difference matters: `found` renders the link, `not_found` renders
+"Nessun link Google Maps disponibile", `unavailable` renders **nothing** — a missing key, a
+throttled call or a network error must never be shown as an absence we verified.
+
 ## Environment variables (.env)
 
 ```
@@ -111,6 +133,7 @@ YOUTUBE_API_KEY=       # optional — YouTube Data API v3
 REDDIT_CLIENT_ID=      # optional — Reddit script app
 REDDIT_CLIENT_SECRET=  # optional — Reddit script app
 APIFY_TOKEN=           # optional — Facebook/TripAdvisor (currently disabled sources)
+GOOGLE_PLACES_API_KEY= # optional — Places API (New); without it the Maps link is simply omitted
 DB_USER=mountain_worker
 DB_PASSWORD=mountain_secret_123
 DB_HOST=localhost

@@ -10,6 +10,7 @@
     "dev": "concurrently --kill-others-on-fail \"tsx watch server.ts\" \"vite\"",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
     "migrate:search": "tsx scripts/migrate-smart-search.ts",
+    "migrate:places": "tsx scripts/migrate-google-places.ts",
     "import:areas": "tsx scripts/import-admin-areas.ts",
     "backfill:elevation": "tsx scripts/backfill-elevation.ts",
     "fetch:data": "tsx scripts/fetch-pois.ts",

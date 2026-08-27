@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
-import { buildUserMessage, AgentOrchestrator, shouldCascade } from '../agent/orchestrator';
+import {
+  buildUserMessage,
+  AgentOrchestrator,
+  shouldCascade,
+  renderGoogleMapsBlock,
+} from '../agent/orchestrator';
+import { resolveGooglePlace } from '../agent/sources/google-places';
 import type { Pool } from 'pg';
 import type { SourceResult, CachedDescription } from '../agent/types';
 import { fetchWikidata } from '../agent/sources/wikidata';
@@ -21,6 +27,8 @@ vi.mock('../agent/sources/youtube', () => ({ fetchYouTubeVideos: vi.fn() }));
 vi.mock('../agent/sources/reddit', () => ({ fetchRedditPosts: vi.fn() }));
 vi.mock('../agent/sources/komoot', () => ({ fetchKomootData: vi.fn() }));
 vi.mock('../agent/prompt-loader', () => ({ loadAgentPrompt: vi.fn(() => 'System prompt') }));
+vi.mock('../agent/sources/google-places', () => ({ resolveGooglePlace: vi.fn() }));
+vi.mock('../agent/google-place-cache', () => ({ GooglePlaceCache: vi.fn() }));
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
   return { ...actual, writeFileSync: vi.fn() };
@@ -92,6 +100,10 @@ beforeEach(() => {
   vi.mocked(fetchYouTubeVideos).mockResolvedValue(makeSourceResult('YouTube'));
   vi.mocked(fetchRedditPosts).mockResolvedValue(makeSourceResult('Reddit'));
   vi.mocked(fetchKomootData).mockResolvedValue(makeSourceResult('Komoot'));
+
+  // Default: no place lookup happened, which is what a run without GOOGLE_PLACES_API_KEY does.
+  // It appends nothing, so tests unrelated to the link can assert on the description as-is.
+  vi.mocked(resolveGooglePlace).mockResolvedValue({ status: 'unavailable' });
 });
 
 // ── buildUserMessage ──────────────────────────────────────────────────────────
@@ -203,6 +215,124 @@ describe('AgentOrchestrator.generate', () => {
 
     const orch = new AgentOrchestrator(mockPool);
     await expect(orch.generate(baseInput)).rejects.toThrow(/All \d+ AI models failed/);
+  });
+});
+
+// ── Google Maps block ─────────────────────────────────────────────────────────
+
+describe('renderGoogleMapsBlock', () => {
+  const url = 'https://www.google.com/maps/search/?api=1&query=Rifugio&query_place_id=ChIJx';
+
+  it('renders a link that opens in a new tab, in Italian like the description', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('<h3>Google Maps</h3>');
+    expect(html).toContain('Apri link Google Maps');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it('renders an icon-only copy button that holds no URL of its own', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('<button type="button" class="gmaps-copy"');
+    expect(html).toContain('aria-label="Copia link"');
+    // Empty element: the glyph is drawn in CSS, since DOMPurify's html profile strips <svg>.
+    expect(html).toContain('></button>');
+    // The URL appears exactly once — the button reads it from the sibling anchor at click time,
+    // so there is no second copy to fall out of sync.
+    expect(html.match(/query_place_id=ChIJx/g)).toHaveLength(1);
+  });
+
+  it('labels the button for both pointer and assistive use', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('title="Copia link"');
+    expect(html).toContain('aria-label="Copia link"');
+  });
+
+  it('gives the button and link a shared row to sit in', () => {
+    expect(renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' })).toContain('class="gmaps-row"');
+  });
+
+  it('renders no button when there is no link to copy', () => {
+    expect(renderGoogleMapsBlock({ status: 'not_found' })).not.toContain('gmaps-copy');
+  });
+
+  it('escapes the href so the query separator cannot break the attribute', () => {
+    const html = renderGoogleMapsBlock({ status: 'found', url, placeId: 'ChIJx' });
+    expect(html).toContain('&amp;query_place_id=');
+    expect(html).not.toMatch(/href="[^"]*[<>]/);
+  });
+
+  it('states the absence when Google answered and had nothing', () => {
+    expect(renderGoogleMapsBlock({ status: 'not_found' })).toContain('Nessun link Google Maps disponibile.');
+  });
+
+  it('renders nothing when the lookup never produced an answer', () => {
+    // A missing key, a throttled call or a network failure must not read as "no link exists".
+    expect(renderGoogleMapsBlock({ status: 'unavailable' })).toBe('');
+  });
+
+  it('renders nothing when status is found but no url came back', () => {
+    expect(renderGoogleMapsBlock({ status: 'found' })).toBe('');
+  });
+});
+
+describe('AgentOrchestrator + Google Maps block', () => {
+  const url = 'https://www.google.com/maps/search/?api=1&query=Rifugio%20Albani&query_place_id=ChIJalb';
+
+  it('appends the link to the description and stores it in the cache', async () => {
+    vi.mocked(resolveGooglePlace).mockResolvedValue({ status: 'found', url, placeId: 'ChIJalb' });
+    const orch = new AgentOrchestrator(mockPool);
+
+    const result = await orch.generate(baseInput);
+
+    expect(result.description).toContain('AI generated description');
+    expect(result.description).toContain('<h3>Google Maps</h3>');
+    expect(mockCacheInstance.set.mock.calls[0][3]).toContain('query_place_id=ChIJalb');
+  });
+
+  it('never puts the URL in the message sent to the model', async () => {
+    vi.mocked(resolveGooglePlace).mockResolvedValue({ status: 'found', url, placeId: 'ChIJalb' });
+    const orch = new AgentOrchestrator(mockPool);
+
+    await orch.generate(baseInput);
+
+    const body = JSON.parse(String((vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body));
+    const prompt = JSON.stringify(body.messages);
+    expect(prompt).not.toContain('query_place_id');
+    expect(prompt).not.toContain('google.com/maps');
+  });
+
+  it('appends the absence line when the place is verified absent', async () => {
+    vi.mocked(resolveGooglePlace).mockResolvedValue({ status: 'not_found' });
+    const orch = new AgentOrchestrator(mockPool);
+    const result = await orch.generate(baseInput);
+    expect(result.description).toContain('Nessun link Google Maps disponibile.');
+  });
+
+  it('leaves the description untouched when the lookup was unavailable', async () => {
+    vi.mocked(resolveGooglePlace).mockResolvedValue({ status: 'unavailable' });
+    const orch = new AgentOrchestrator(mockPool);
+
+    const result = await orch.generate(baseInput);
+
+    expect(result.description).toBe('AI generated description');
+    expect(result.description).not.toContain('Google Maps');
+  });
+
+  it('starts the lookup before awaiting the sources, so it costs no extra latency', async () => {
+    const order: string[] = [];
+    vi.mocked(resolveGooglePlace).mockImplementation(async () => {
+      order.push('places');
+      return { status: 'not_found' };
+    });
+    vi.mocked(fetchWikidata).mockImplementation(async () => {
+      order.push('wikidata');
+      return makeSourceResult('Wikidata');
+    });
+
+    await new AgentOrchestrator(mockPool).generate(baseInput);
+
+    expect(order[0]).toBe('places');
   });
 });
 
