@@ -84,8 +84,11 @@ function renderAltitudeText(elevation: number | null | undefined, isLoading: boo
   return 'Not available';
 }
 
+// DOMPurify's default HTML attribute allow-list includes `rel` but not `target`, so the Google
+// Maps link the agent appends would be stripped of target="_blank" and navigate away from the PWA
+// in the same tab. rel="noopener noreferrer" survives on its own and is emitted alongside.
 function sanitizeAiHtml(html: string): string {
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target'] });
 }
 
 export function escapeHtml(str: string | null | undefined): string {
