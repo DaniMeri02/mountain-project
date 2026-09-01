@@ -2,10 +2,9 @@
   "name": "mountain-project",
   "version": "1.0.0",
   "description": "A local web portal for exploring mountain huts, bivouacs, and peaks via interactive maps, featuring an AI assistant for aggregating and summarizing hiking data",
-  "license": "ISC",
+  "license": "MIT",
   "author": "DaniMeri",
   "type": "commonjs",
-  "main": "index.js",
   "scripts": {
     "dev": "concurrently --kill-others-on-fail \"tsx watch server.ts\" \"vite\"",
     "migrate:ai": "tsx scripts/migrate-ai-cache.ts",
