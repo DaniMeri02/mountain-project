@@ -16,7 +16,7 @@ Postgres works — override the values in `.env`.
 
 ```sql
 CREATE DATABASE mountain_db;
-CREATE USER mountain_worker WITH PASSWORD 'mountain_secret_123';
+CREATE USER mountain_worker WITH PASSWORD '<your-db-password>';
 GRANT ALL PRIVILEGES ON DATABASE mountain_db TO mountain_worker;
 \c mountain_db
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -54,8 +54,13 @@ npm run migrate:search      # admin_areas + make pois.elevation nullable
 npm run migrate:places      # google_place_cache + google_places_usage
 npm run import:areas        # ISTAT/openpolis province + region polygons
 npm run import:pois         # load public/data/pois.geojson into pois
-npm run import:ferrata      # load the via-ferrata snapshot from exports/
 npm run backfill:elevation  # optional — fill missing elevations from a DEM API
+
+# The via-ferrata scripts are the odd ones out: they read PG* environment
+# variables directly and ignore .env, and the importer needs the snapshot path.
+PGHOST=localhost PGPORT=5433 PGUSER=mountain_worker PGPASSWORD=<your-db-password> \
+PGDATABASE=mountain_db npm run import:ferrata -- exports/<snapshot>.json
+
 npm run dev
 ```
 
@@ -81,9 +86,9 @@ The POI and ferrata datasets are committed (`public/data/pois.geojson`,
 | `test` / `test:watch` / `test:coverage` | Vitest |
 | `migrate:ai` `migrate:search` `migrate:places` | one-time DDL, idempotent |
 | `import:areas` | fetch + load administrative boundaries |
-| `import:pois` `import:ferrata` | load committed datasets into Postgres |
-| `fetch:data` `fetch:trails` `fetch:ferrata` | re-fetch from Overpass (slow, chunked, resumable) |
-| `export:ferrata` | snapshot `via_ferrata` back to JSON |
+| `import:pois` | load `public/data/pois.geojson` into Postgres |
+| `import:ferrata` `export:ferrata` `fetch:ferrata` | via-ferrata snapshot in/out. **`PG*` env only — these ignore `.env` and require `PGPASSWORD`**; the importer also takes a snapshot path after `--` |
+| `fetch:data` `fetch:trails` | re-fetch from Overpass (slow, chunked, resumable) |
 | `backfill:elevation` | fill missing POI elevations from a DEM API |
 | `patch:tracks` | extend trail coverage over an extra area |
 

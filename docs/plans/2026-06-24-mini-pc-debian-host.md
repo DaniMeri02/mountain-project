@@ -96,7 +96,7 @@ First goal is just the project running in **dev mode** — Vite on `:5173` + Fas
   ```
 - Create role + db + extension:
   ```
-  sudo -u postgres psql -c "CREATE ROLE mountain_worker LOGIN PASSWORD 'mountain_secret_123';"
+  sudo -u postgres psql -c "CREATE ROLE mountain_worker LOGIN PASSWORD '<your-db-password>';"
   sudo -u postgres createdb -O mountain_worker mountain_db
   sudo -u postgres psql -d mountain_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
   ```
