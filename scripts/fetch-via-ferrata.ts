@@ -134,9 +134,14 @@ if (!Number.isFinite(dbPort)) {
   throw new Error('Invalid PGPORT value');
 }
 
+const dbPassword = process.env.PGPASSWORD;
+if (!dbPassword) {
+  throw new Error('PGPASSWORD is required. This script reads PG* env vars directly, not .env');
+}
+
 const pool = new Pool({
   user: process.env.PGUSER || 'mountain_worker',
-  password: process.env.PGPASSWORD || 'mountain_secret_123',
+  password: dbPassword,
   host: process.env.PGHOST || 'localhost',
   port: dbPort,
   database: process.env.PGDATABASE || 'mountain_db'

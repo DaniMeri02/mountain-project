@@ -44,11 +44,15 @@ type ViaFerrataSnapshot = {
 const dbHost = process.env.PGHOST || 'localhost';
 const dbPort = Number(process.env.PGPORT || '5433');
 const dbUser = process.env.PGUSER || 'mountain_worker';
-const dbPassword = process.env.PGPASSWORD || 'mountain_secret_123';
+const dbPassword = process.env.PGPASSWORD;
 const dbName = process.env.PGDATABASE || 'mountain_db';
 
 if (!Number.isFinite(dbPort)) {
   throw new Error('Invalid PGPORT value');
+}
+
+if (!dbPassword) {
+  throw new Error('PGPASSWORD is required. This script reads PG* env vars directly, not .env');
 }
 
 const pool = new Pool({
