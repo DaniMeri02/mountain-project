@@ -66,7 +66,7 @@ export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
     const response = await fetch(url, {
       headers: {
         Accept: 'application/sparql-results+json',
-        'User-Agent': 'MountainPortal/1.0 (personal project; contact: localhost)',
+        'User-Agent': 'MountainPortal/1.0 (+https://github.com/DaniMeri02/mountain-project)',
       },
       signal: AbortSignal.timeout(12_000),
     });
@@ -109,7 +109,7 @@ export async function fetchWikidata(input: AgentInput): Promise<SourceResult> {
     const coordRes = await fetch(coordUrl, {
       headers: {
         Accept: 'application/sparql-results+json',
-        'User-Agent': 'MountainPortal/1.0 (personal project; contact: localhost)',
+        'User-Agent': 'MountainPortal/1.0 (+https://github.com/DaniMeri02/mountain-project)',
       },
       signal: AbortSignal.timeout(12_000),
     });

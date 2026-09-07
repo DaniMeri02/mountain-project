@@ -126,16 +126,17 @@ throttled call or a network error must never be shown as an absence we verified.
 ## Environment variables (.env)
 
 ```
-GROQ_API_KEY=          # required — free at console.groq.com
-GEMINI_API_KEY=        # optional — Google Gemini (first in cascade)
-OPENROUTER_API_KEY=    # optional — OpenRouter fallback
+GEMINI_API_KEY=        # cascade models 1-2 — free at aistudio.google.com
+GROQ_API_KEY=          # cascade models 3-4 — free at console.groq.com
+OPENROUTER_API_KEY=    # cascade model 5 — free at openrouter.ai
 YOUTUBE_API_KEY=       # optional — YouTube Data API v3
 REDDIT_CLIENT_ID=      # optional — Reddit script app
 REDDIT_CLIENT_SECRET=  # optional — Reddit script app
 APIFY_TOKEN=           # optional — Facebook/TripAdvisor (currently disabled sources)
 GOOGLE_PLACES_API_KEY= # optional — Places API (New); without it the Maps link is simply omitted
+MAPBOX_TOKEN=          # required — public token; the frontend fetches it from GET /api/config
 DB_USER=mountain_worker
-DB_PASSWORD=mountain_secret_123
+DB_PASSWORD=       # required — whatever you set on the mountain_worker role
 DB_HOST=localhost
 DB_PORT=5433
 DB_NAME=mountain_db

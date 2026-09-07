@@ -31,7 +31,7 @@ async function fetchAndInsertTracks(bboxStr: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'MountainPortal/1.0 (personal hiking app; contact danimerry2002@gmail.com)',
+      'User-Agent': 'MountainPortal/1.0 (+https://github.com/DaniMeri02/mountain-project)',
     },
     body: `data=${encodeURIComponent(query)}`
   });
