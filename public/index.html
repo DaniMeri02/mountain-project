@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2e7d32">
+  <title>Mountain Huts and Peaks Portal</title>
+  <link rel="icon" href="data:,">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <link href="./css/style.css" rel="stylesheet" />
+  <script type="module" crossorigin src="/assets/index-DRPWSNXr.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DAZXwIcS.css">
+<script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+<body>
+
+  <nav id="topnav" aria-label="Main navigation">
+    <button id="nav-burger" class="nav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="nav-brand">Mountain Portal</span>
+    <div id="search-container" role="search">
+      <input id="search-box" type="search" placeholder="Search…" autocomplete="off" />
+      <button id="ai-search-btn" type="button" aria-label="Smart AI search" title="Smart search with AI">✨</button>
+      <ul id="search-results" hidden></ul>
+    </div>
+  </nav>
+
+  <aside id="nav-drawer" class="nav-drawer" aria-hidden="true">
+    <div class="nav-drawer-header">
+      <span class="nav-drawer-title">Mountain Portal</span>
+      <button id="nav-drawer-close" class="nav-drawer-close" aria-label="Close menu">×</button>
+    </div>
+
+    <section class="nav-section" id="drawer-section-basemap">
+      <h3>Basemap</h3>
+      <div id="menu">
+        <label class="nav-option"><input id="outdoors-v12" type="radio" name="map-style" value="outdoors-v12" checked> MapBox</label>
+        <label class="nav-option"><input id="satellite-streets-v12" type="radio" name="map-style" value="satellite-streets-v12"> MapBox sat 2D</label>
+        <label class="nav-option"><input id="satellite-3d" type="radio" name="map-style" value="satellite-streets-v12"> MapBox sat 3D</label>
+        <label class="nav-option"><input id="osm" type="radio" name="map-style" value="osm"> OpenStreetMap</label>
+        <label class="nav-option"><input id="opentopo" type="radio" name="map-style" value="opentopo"> TopoMap</label>
+      </div>
+    </section>
+
+    <section class="nav-section" id="drawer-section-layers">
+      <h3>Layers</h3>
+      <label class="nav-option"><input type="checkbox" id="toggle-trails" checked> Trails</label>
+      <label class="nav-option"><input type="checkbox" id="toggle-ferrata" checked> Via Ferrata</label>
+      <label class="nav-option"><input type="checkbox" id="toggle-icons" checked> Icons</label>
+    </section>
+
+    <section class="nav-section" id="drawer-section-routing">
+      <h3>Routing</h3>
+      <!-- routing/index.js injects Find Route button here -->
+    </section>
+
+    <section class="nav-section" id="drawer-section-offline">
+      <h3>Offline</h3>
+      <!-- offline.js injects buttons + saved-areas list here -->
+    </section>
+  </aside>
+
+  <div id="nav-backdrop" class="nav-backdrop" hidden></div>
+
+  <main>
+    <div id='map-container'>
+      <div id='map'></div>
+
+      <button
+        id='toggle-map-fullscreen'
+        class='map-corner-btn'
+        type='button'
+        aria-pressed='false'
+        aria-label='Enter fullscreen map mode'
+        title='Enter fullscreen map mode'
+      >
+        ⛶
+      </button>
+    </div>
+    <div id='panel'>
+      <h2>Location Details</h2>
+      <p>Select a location on the map to view more information here.</p>
+    </div>
+  </main>
+
+
+</body>
+</html>

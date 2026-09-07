@@ -1,0 +1,15 @@
+{
+  "name": "Mountain Portal",
+  "short_name": "Mountain",
+  "description": "Explore mountain huts, peaks, bivouacs, and via ferrata in the Italian Alps — works offline.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1f2933",
+  "theme_color": "#2e7d32",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
