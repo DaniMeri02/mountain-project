@@ -1,7 +1,7 @@
 {
   "name": "mountain-project",
   "version": "1.0.0",
-  "description": "A local web portal for exploring mountain huts, bivouacs, and peaks via interactive maps, featuring an AI assistant for aggregating and summarizing hiking data",
+  "description": "An interactive map for exploring mountain huts, bivouacs, peaks and via ferrata, featuring an AI assistant for aggregating and summarizing hiking data",
   "license": "MIT",
   "author": "DaniMeri",
   "type": "commonjs",
