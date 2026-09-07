@@ -1,6 +1,6 @@
 # Mountain Portal
 
-**An interactive map of the Italian Alps that researches a mountain hut for you.**
+**An interactive map that researches a mountain hut for you.**
 
 Huts, bivouacs, peaks and via ferrata on one map — and an AI agent that reads seven sources and
 writes you a single briefing on any of them.
